@@ -181,10 +181,11 @@ FoodGuard-Frontend/.env.local
 # Project root files (not needed in git)
 # ===========================================
 
-# Build/Package managers
-uv.lock
-pyproject.toml
-main.py
+# Build/Package managers (root-level only — leading slash anchors to repo root
+# so we don't accidentally ignore FoodGuard-AI/app/main.py, etc.)
+/uv.lock
+/pyproject.toml
+/main.py
 
 
 # CLAUDE.md (project instructions for AI assistants)
