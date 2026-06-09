@@ -1,0 +1,91 @@
+{
+  "info": {
+    "name": "FoodGuard AI Service API",
+    "description": "Sample requests for testing the FoodGuard AI microservice",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      }
+    },
+    {
+      "name": "Recommend Meals",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/ai/recommend-meals",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ingredients\": [\"chicken\", \"rice\", \"broccoli\", \"tomatoes\", \"garlic\"],\n  \"dietary_preference\": \"non_vegetarian\",\n  \"health_condition\": \"weight_loss\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Nutrition Analysis",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/ai/nutrition-analysis",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"food_items\": [\"chicken breast\", \"brown rice\", \"broccoli\", \"olive oil\", \"eggs\"]\n}"
+        }
+      }
+    },
+    {
+      "name": "Expiry Insights",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/ai/expiry-insights",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"inventory_items\": [\n    {\n      \"name\": \"Milk\",\n      \"quantity\": \"1 gallon\",\n      \"expiry_date\": \"2026-06-10\",\n      \"category\": \"dairy\"\n    },\n    {\n      \"name\": \"Eggs\",\n      \"quantity\": \"12\",\n      \"expiry_date\": \"2026-06-15\",\n      \"category\": \"dairy\"\n    },\n    {\n      \"name\": \"Bread\",\n      \"quantity\": \"1 loaf\",\n      \"expiry_date\": \"2026-06-07\",\n      \"category\": \"bakery\"\n    },\n    {\n      \"name\": \"Chicken\",\n      \"quantity\": \"2 lbs\",\n      \"expiry_date\": \"2026-06-08\",\n      \"category\": \"meat\"\n    }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "Dashboard Summary",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/ai/dashboard-summary",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"inventory\": [\n    {\n      \"name\": \"Rice\",\n      \"category\": \"grains\",\n      \"quantity\": \"5 kg\",\n      \"expiry_date\": \"2027-01-15\",\n      \"consumed_count\": 10,\n      \"wasted_count\": 0\n    },\n    {\n      \"name\": \"Milk\",\n      \"category\": \"dairy\",\n      \"quantity\": \"2 gallons\",\n      \"expiry_date\": \"2026-06-10\",\n      \"consumed_count\": 5,\n      \"wasted_count\": 2\n    },\n    {\n      \"name\": \"Chicken\",\n      \"category\": \"meat\",\n      \"quantity\": \"3 lbs\",\n      \"expiry_date\": \"2026-06-08\",\n      \"consumed_count\": 8,\n      \"wasted_count\": 1\n    },\n    {\n      \"name\": \"Tomatoes\",\n      \"category\": \"vegetables\",\n      \"quantity\": \"1 kg\",\n      \"expiry_date\": \"2026-06-12\",\n      \"consumed_count\": 3,\n      \"wasted_count\": 2\n    }\n  ],\n  \"user_health_goals\": \"weight loss, reduce sugar intake\"\n}"
+        }
+      }
+    }
+  ]
+}

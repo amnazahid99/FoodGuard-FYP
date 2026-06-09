@@ -1,0 +1,191 @@
+# ===========================================
+# FoodGuard Project - Complete .gitignore
+# ===========================================
+
+# -------------------- Python --------------------
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+*.log
+
+# Environments
+.env
+.env.local
+.env.*.local
+*.env
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# -------------------- Node.js / Frontend --------------------
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.nuxt/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+*.local
+.env.development
+.env.production
+.env.test
+
+# -------------------- Backend --------------------
+# MongoDB data (local)
+data/
+*.mog
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Local config
+config/local.js
+config/development.json
+config/production.json
+
+# Jupyter
+.ipynb_checkpoints/
+.ipynb
+*.ipynb
+
+# -------------------- Misc --------------------
+# Git
+*.orig
+
+# Temp files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Credentials (keep this if you have any sensitive files)
+*.pem
+*.key
+*.crt
+
+# Docker
+.dockerignore
+
+# Secrets (explicitly keep .env files in git if needed, otherwise remove)
+# .env
+
+# ===========================================
+# Project-specific ignores
+# ===========================================
+
+# FoodGuard-AI
+FoodGuard-AI/venv/
+FoodGuard-AI/__pycache__/
+FoodGuard-AI/.pytest_cache/
+
+# FoodGuard-Backend
+FoodGuard-Backend/node_modules/
+FoodGuard-Backend/dist/
+
+# FoodGuard-Frontend
+FoodGuard-Frontend/node_modules/
+FoodGuard-Frontend/dist/
+FoodGuard-Frontend/.env.local
+
+# Root venv (created by uv)
+.venv/
+
+# Temporary build files
+*.tar.gz
+*.zip
+
+# ===========================================
+# Claude Code (AI Assistant)
+# ===========================================
+.claude/
+
+# ===========================================
+# Project root files (not needed in git)
+# ===========================================
+
+# Build/Package managers
+uv.lock
+pyproject.toml
+main.py
+
+
+# CLAUDE.md (project instructions for AI assistants)
+CLAUDE.md
