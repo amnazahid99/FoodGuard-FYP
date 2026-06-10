@@ -1,4 +1,4 @@
-> **Final Year Project** 
+**Final Year Project** 
 # 🍃 FoodGuard:
 **An intelligent food management system that helps users track inventory, analyze nutrition, reduce food wastage, and get AI-powered meal recommendations.**
 
@@ -12,8 +12,25 @@
 
 ---
 
+## 🌐 Live Demo
+
+FoodGuard is **deployed and live** as three independent services:
+
+| Service | URL |
+|---------|-----|
+| 🖥️ **Live App (Frontend)** | **https://food-guard-fypp.vercel.app/** |
+| ⚙️ **Backend API** | https://foodguard-fyp.onrender.com — health check: `/api/health` |
+| 🤖 **AI Microservice** | https://foodguard-fyp-ai.onrender.com — health check: `/health` |
+| 💻 **Source Code (GitHub)** | https://github.com/amnazahid99/FoodGuard-FYP |
+
+> Hosted on **Vercel** (frontend), **Render** (backend + AI service), and **MongoDB Atlas** (database), with automatic CI/CD on every push to `main`.
+> ⏳ The free Render tier sleeps after ~15 min of inactivity, so the **first request after a pause may take 30–60s** to wake.
+
+---
+
 ## 📋 Table of Contents
 
+- [🌐 Live Demo](#-live-demo)
 - [🌟 Features](#-features)
 - [🏗️ Architecture](#️-architecture)
 - [🛠️ Tech Stack](#️-tech-stack)
@@ -92,7 +109,9 @@
 2. **Frontend** sends requests to Express Backend
 3. **Backend** processes business logic and interacts with MongoDB
 4. **Backend** calls FastAPI AI Service for intelligent features
-5. **AI Service** uses Groq (LLM), Gemini (Vision), and Fireworks (OCR) APIs
+5. **AI Service** uses **Groq** (LLM for meals/nutrition/chatbot **and** vision for OCR by default). Fireworks/Gemini are used for OCR only when their keys are set, so a **single `GROQ_API_KEY` powers everything**.
+
+> 💡 If the AI service is unreachable, the backend returns a clean **503** with a friendly message (never a crash or fake data). Rule-based features (BMI, wastage report) work even without any AI key.
 
 ---
 
@@ -127,12 +146,12 @@
 ### AI Service
 | Technology | Purpose |
 |------------|---------|
-| Python 3.11 | Runtime |
+| Python 3.11–3.13 (**3.12 recommended**) | Runtime — note: 3.14 is **not** supported yet (deps won't build) |
 | FastAPI | Web Framework |
 | Uvicorn | ASGI Server |
-| Groq | LLM (Llama, Mixtral) |
-| Google Gemini | Vision & Text AI |
-| Fireworks AI | OCR (Receipt Scanning) |
+| Groq | LLM (Llama-3.3) **+ Llama-4 Scout vision for OCR** |
+| Fireworks AI | OCR vision model (optional — used if `FIREWORKS_API_KEY` set) |
+| Google Gemini | Optional vision/text AI |
 | Pydantic | Data Validation |
 
 ### External APIs
@@ -233,19 +252,19 @@ Final Project-updated/
 | Software | Version | Notes |
 |----------|---------|-------|
 | Node.js | 18+ | Required for Frontend & Backend |
-| Python | 3.11 - 3.13 | Required for AI Service |
+| Python | 3.11 - 3.13 (**3.12 recommended**) | AI Service — **not 3.14** (dependencies won't build) |
 | MongoDB | 5.0+ | Local or Atlas cloud |
 | Git | Latest | Version control |
 
 ### Required Accounts
 
-1. **MongoDB Atlas** (optional) — https://www.mongodb.com/cloud/atlas
-2. **Groq** — https://console.groq.com (free API key)
-3. **Google Gemini** — https://aistudio.google.com/app/apikey (free API key)
-4. **Fireworks AI** — https://fireworks.ai (API key required for OCR/receipt scanning)
-5. **Spoonacular** (optional) — https://spoonacular.com/food-api (free tier)
-6. **CalorieNinjas** (optional) — https://calorieninjas.com/api (free tier)
-7. **Stripe** (optional) — https://stripe.com (required for payment features)
+1. **Groq** — https://console.groq.com (**free, the only required key** — powers meals + OCR)
+2. **MongoDB Atlas** (optional locally, required for cloud) — https://www.mongodb.com/cloud/atlas
+3. **Fireworks AI** (optional) — https://fireworks.ai (only if you prefer Fireworks over Groq for OCR)
+4. **Google Gemini** (optional) — https://aistudio.google.com/app/apikey
+5. **Spoonacular** (optional) — https://spoonacular.com/food-api (richer recipe data)
+6. **CalorieNinjas** (optional) — https://calorieninjas.com/api (nutrition lookups)
+7. **Stripe** (optional) — https://stripe.com (only for the payment/upgrade feature)
 
 ---
 
@@ -262,29 +281,43 @@ cd "Final Project-updated"
 Create `FoodGuard-Backend/.env`:
 
 ```env
-# MongoDB
+NODE_ENV=development
+
+# MongoDB (local, or your MongoDB Atlas string)
 MONGO_URI=mongodb://127.0.0.1:27017/foodguard
 
-# JWT Secrets
+# JWT Secrets — generate strong random strings, e.g.
+#   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 JWT_SECRET=your-super-secret-jwt-key
 JWT_REFRESH_SECRET=your-super-secret-refresh-key
+JWT_EXPIRES_IN=7d
+JWT_REFRESH_EXPIRES_IN=30d
 
-# Frontend URL (for CORS)
+# Frontend URL (for CORS) — no trailing slash
 CLIENT_URL=http://localhost:3000
 
-# Server Port
+# Server Port (local only; on Render leave this unset — it provides PORT)
 PORT=5001
 
-# AI service base URL (change if not running on default)
+# AI service base URL
 FASTAPI_URL=http://localhost:8000
+
+# Stripe (optional — billing returns a clean 503 until set)
+# STRIPE_SECRET_KEY=sk_test_...
 ```
+
+> 🔒 The backend **validates these on startup** and refuses to boot with a clear message if `MONGO_URI`, `JWT_SECRET`, or `JWT_REFRESH_SECRET` is missing — preventing confusing runtime 500s.
 
 ### 3. Frontend Environment
 
 Update `FoodGuard-Frontend/.env`:
 
 ```env
+# Local dev — the Vite dev server proxies /api to this origin
 VITE_API_URL=http://localhost:5001/api
+
+# Production (e.g. Vercel) — the URL the built app calls directly
+# VITE_API_BASE=https://foodguard-fyp.onrender.com/api
 ```
 
 ### 4. AI Service Environment
@@ -292,24 +325,18 @@ VITE_API_URL=http://localhost:5001/api
 Update `FoodGuard-AI/.env`:
 
 ```env
-# Groq API (required)
+# Groq API — the ONLY required key (powers meals, nutrition, chatbot, AND OCR).
+# Without it, AI endpoints return a clean 503; BMI & wastage still work.
 GROQ_API_KEY=your-groq-api-key
 
-# Gemini API (required)
-GEMINI_API_KEY=your-gemini-api-key
-
-# Fireworks AI API (required for OCR / receipt scanning)
-FIREWORKS_API_KEY=your-fireworks-api-key
-
-# Spoonacular API (optional)
-SPOONACULAR_API_KEY=your-spoonacular-api-key
-
-# CalorieNinjas API (optional)
-CALORIENINJAS_API_KEY=your-calorieninjas-api-key
+# Optional — Fireworks is used for OCR only if set (otherwise Groq vision is used)
+FIREWORKS_API_KEY=
+# Optional extras
+GEMINI_API_KEY=
+SPOONACULAR_API_KEY=
+CALORIENINJAS_API_KEY=
 
 # Server Settings
-APP_HOST=0.0.0.0
-APP_PORT=8000
 LOG_LEVEL=INFO
 ```
 
@@ -334,6 +361,18 @@ make run-frontend # React Frontend :3000
 # Stop all services
 make stop
 ```
+
+### Option 1b: Windows (one-click scripts)
+
+`make` is a Unix tool, so on Windows use the included batch scripts in the project root:
+
+```bat
+setup.bat   :: one-time — creates the Python venv (3.12) + installs all dependencies
+dev.bat     :: starts all 3 services (each in its own window)
+stop.bat    :: stops everything on ports 8000 / 5001 / 3000
+```
+
+> `setup.bat` auto-detects Python **3.12 → 3.11 → 3.13**. If none are installed, run `winget install Python.Python.3.12` first.
 
 ### Option 2: Manual Setup
 
@@ -363,13 +402,18 @@ npm install
 
 #### Step 4: Install AI Service Dependencies
 
+Use **Python 3.12** (3.11/3.13 also work; **3.14 will fail** to build the dependencies):
+
 ```bash
 cd FoodGuard-AI
-# Using uv (recommended)
-uv sync
 
-# Or using pip
-pip install -r requirements.txt
+# macOS / Linux
+python3.12 -m venv venv
+./venv/bin/python -m pip install -r requirements.txt
+
+# Windows (PowerShell / CMD)
+py -3.12 -m venv venv
+venv\Scripts\python -m pip install -r requirements.txt
 ```
 
 #### Step 5: Start All Services
@@ -377,7 +421,10 @@ pip install -r requirements.txt
 **Terminal 1 — AI Service:**
 ```bash
 cd FoodGuard-AI
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# macOS / Linux
+./venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# Windows
+venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 **Terminal 2 — Backend:**
@@ -494,25 +541,42 @@ The FoodGuard frontend includes the following main screens:
 | CORS errors | Ensure `CLIENT_URL` matches frontend URL |
 | AI service not responding | Check API keys in `FoodGuard-AI/.env` |
 | `ECONNREFUSED 127.0.0.1:8000` | Start FastAPI AI service on port 8000 |
-| `401 Not authorized` | Check JWT token validity and expiry |
-| `Recipe shows wrong data` | Ensure using latest code with stable ID mapping |
+| `401 Not authorized` | Token missing/expired — the app auto-logs-out on 401; sign in again |
+| `Recipe shows wrong data` | Fixed — recipes are persisted per user, so the correct one always opens |
+| **(Render)** `No open ports detected` | Backend start command must be `npm start` (not `npm run dev`); AI must use `--port $PORT`. **Do not set `PORT`/`APP_PORT`.** |
+| **(Render)** `Could not import module "app.main"` | `FoodGuard-AI/app/main.py` was excluded by `.gitignore` — ensure it's committed (`git add -f FoodGuard-AI/app/main.py`) |
+| **(Local)** `No suitable Python runtime` / pydantic build fails | You're on Python 3.14 — use **3.12** (`py -3.12 -m venv venv`) |
+| **(Deploy)** CORS blocked / no `Access-Control-Allow-Origin` | Set backend `CLIENT_URL` to the exact frontend origin, **no trailing slash** |
+| **(Deploy)** `Network Error` on login (services up) | Set Vercel `VITE_API_BASE` to the backend URL **and redeploy**; check Atlas allows `0.0.0.0/0` |
 
-### Production Deployment Notes
+### Production Deployment (Live Setup)
 
-**Vercel (Frontend):**
-- Set environment variable: `VITE_API_URL=https://your-backend-url.onrender.com/api`
-- Build command: `npm run build`
-- Output directory: `dist`
+The live system runs on **Vercel + Render + MongoDB Atlas**. Each service is a separate deployment from the **same GitHub repo** (set the **Root Directory** accordingly).
 
-**Render (Backend):**
-- Set all `.env` variables in Render dashboard
-- Start command: `npm run dev` or `node server.js`
-- Ensure MongoDB connection string uses MongoDB Atlas for production
+**1. MongoDB Atlas (database)**
+- Create a free cluster + a database user.
+- **Network Access → add `0.0.0.0/0`** (Render's IPs vary, so it must allow all).
+- Connection string: `mongodb+srv://USER:PASS@cluster.xxxx.mongodb.net/foodguard?retryWrites=true&w=majority`
 
-**FastAPI AI Service:**
-- Can be deployed to Render, Railway, or any Python-compatible platform
-- Required environment variables: `GROQ_API_KEY`, `GEMINI_API_KEY`, `FIREWORKS_API_KEY`
-- Health check endpoint: `/health`
+**2. Render — Backend (`FoodGuard-Backend`)**
+- Build command: `npm install`
+- **Start command: `npm start`** ⚠️ *(not `npm run dev` — nodemon is dev-only and causes "no open ports detected")*
+- Env vars: `NODE_ENV=production`, `MONGO_URI`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `CLIENT_URL`, `FASTAPI_URL`
+- ⚠️ **Do not set `PORT`** — Render assigns it automatically.
+- `CLIENT_URL` must be the **exact** Vercel URL with **no trailing slash** (e.g. `https://food-guard-fypp.vercel.app`).
+
+**3. Render — AI Service (`FoodGuard-AI`)**
+- Build command: `pip install -r requirements.txt`
+- **Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`**
+- Env vars: `GROQ_API_KEY`, `PYTHON_VERSION=3.12.7` (optional: `FIREWORKS_API_KEY`, `GEMINI_API_KEY`, `SPOONACULAR_API_KEY`, `CALORIENINJAS_API_KEY`)
+- ⚠️ **Do not set `APP_PORT`** — the start command uses `$PORT`.
+
+**4. Vercel — Frontend (`FoodGuard-Frontend`)**
+- Build command: `npm run build` · Output directory: `dist`
+- Env var: **`VITE_API_BASE=https://foodguard-fyp.onrender.com/api`**
+- ⚠️ **Redeploy after changing env vars** — Vite bakes them in at build time.
+
+Then verify the deployment via the health endpoints: `/<backend>/api/health` and `/<ai>/health`.
 
 ### Getting Help
 
