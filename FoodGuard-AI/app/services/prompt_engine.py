@@ -10,43 +10,69 @@ class PromptEngine:
         ingredients: List[str],
         dietary_preference: Optional[str] = None,
         health_condition: Optional[str] = None,
-        cuisine_preference: Optional[str] = None
+        cuisine_preference: Optional[str] = None,
+        expiring_items: Optional[List[str]] = None,
+        inventory_items: Optional[List[Dict[str, Any]]] = None,
+        health_profile: Optional[Dict[str, Any]] = None,
+        units: Optional[str] = None,
+        expiring_warn_days: Optional[int] = 3,
     ) -> str:
         """
         Build prompt for meal recommendation.
         """
-        dietary_text = ""
-        if dietary_preference and dietary_preference != "none":
-            dietary_text = f"\nDietary preference (must respect): {dietary_preference}"
+        dietary_text = f"\nDietary preference (must respect): {dietary_preference}" if dietary_preference else ""
+        health_text = f"\nHealth condition (tailor meals for this): {health_condition}" if health_condition else ""
+        cuisine_text = f"\nPreferred cuisine (STRICTLY use ONLY this cuisine for every meal — {cuisine_preference})" if cuisine_preference else ""
+        expiring_text = f"\nPrioritize these expiring inventory items (within {expiring_warn_days} days of expiry) and use at least one where sensible: {', '.join(expiring_items)}" if expiring_items else ""
+        inventory_text = f"\nActive inventory JSON: {json.dumps(inventory_items or [])}" if inventory_items else ""
+        profile = health_profile or {}
+        profile_text = f"""
+User health profile:
+- Units: {units or profile.get('units') or 'metric'}
+- Daily calorie target: {profile.get('daily_calories') or 'not specified'}
+- Macro targets: {profile.get('macros') or 'not specified'}
+- Health goal: {profile.get('health_goal') or 'not specified'}
+- Activity level: {profile.get('activity_level') or 'not specified'}
+- BMI: {profile.get('bmi') or 'not specified'}"""
 
-        health_text = ""
-        if health_condition and health_condition != "none":
-            health_text = f"\nHealth condition (tailor meals for this): {health_condition}"
-
-        cuisine_text = ""
-        if cuisine_preference and cuisine_preference != "none":
-            cuisine_text = f"\nPreferred cuisine (favour dishes from this cuisine): {cuisine_preference}"
-
-        return f"""You are a professional nutritionist. Generate 5 meal recommendations based on available ingredients.
+        return f"""You are a professional nutritionist and AI chef. Generate 5 personalized meal recommendations based on available inventory.
 
 Available ingredients: {', '.join(ingredients)}
 {dietary_text}
 {health_text}
 {cuisine_text}
+{expiring_text}
+{inventory_text}
+{profile_text}
 
-For each meal, provide:
-1. name: Creative meal name
-2. calories: Estimated calorie count (integer)
-3. protein: Protein in grams (float, 1 decimal)
-4. carbs: Carbohydrates in grams (float, 1 decimal)
-5. fats: Fat content in grams (float, 1 decimal)
-6. reasoning: Why this meal fits the user's needs (1-2 sentences)
+Rules:
+1. Respect dietary preference and health condition.
+2. Prioritize expiring inventory items and reduce food waste.
+3. Use inventory names in used_ingredients/missed_ingredients.
+4. Return ONLY valid JSON, no markdown, no code fences.
 
-Return ONLY a JSON array (no markdown, no code blocks) with this exact structure:
-[
-  {{"name": "Meal Name", "calories": 500, "protein": 25.0, "carbs": 50.0, "fats": 15.0, "reasoning": "..."}},
-  ... (5 meals total)
-]"""
+Return a JSON object with this exact structure:
+{{
+  "meals": [
+    {{
+      "name": "Meal Name",
+      "calories": 500,
+      "protein": 25.0,
+      "carbs": 50.0,
+      "fats": 15.0,
+      "difficulty": "Easy",
+      "cuisine": "Pakistani",
+      "match_score": 85,
+      "used_ingredients": ["chicken", "spinach"],
+      "missed_ingredients": ["olive oil"],
+      "uses_expiring": true,
+      "health_note": "Fits the selected dietary and health constraints.",
+      "reasoning": "Why this meal fits the user's needs.",
+      "ingredients": ["chicken", "spinach", "olive oil"],
+      "instructions": ["Cook chicken until done.", "Add spinach and serve."]
+    }}
+  ]
+}}"""
 
     @staticmethod
     def build_nutrition_analysis_prompt(food_items: List[str]) -> str:
@@ -292,26 +318,54 @@ Provide a helpful, concise response. If suggesting recipes or meals, include bri
     def build_condition_meal_plan_prompt(
         condition: str,
         available_ingredients: List[str],
-        days: int = 7
+        days: int = 7,
+        dietary_preference: Optional[str] = None,
+        cuisine_preference: Optional[str] = None,
+        units: Optional[str] = None,
+        health_profile: Optional[Dict[str, Any]] = None,
+        inventory_items: Optional[List[Dict[str, Any]]] = None,
+        expiring_warn_days: Optional[int] = 3,
     ) -> str:
-        """Build prompt for a condition-based multi-day meal plan."""
+        """Build prompt for a condition-appropriate multi-day meal plan."""
         ingredients_text = ", ".join(available_ingredients) if available_ingredients else "common pantry staples"
-        return f"""You are a clinical dietitian. Create a {days}-day meal plan tailored for a person with this health condition: {condition}.
+        dietary_text = f"\nDietary preference (must respect): {dietary_preference}" if dietary_preference else ""
+        cuisine_text = f"\nPreferred cuisine (STRICTLY use ONLY this cuisine for every meal — {cuisine_preference})" if cuisine_preference else ""
+        units_text = f"\nMeasurement units: {units or 'metric'}"
+        profile = health_profile or {}
+        profile_text = f"""
+User health profile:
+- Daily calorie target: {profile.get('daily_calories') or 'not specified'}
+- Macro targets: {profile.get('macros') or 'not specified'}
+- Health goal: {profile.get('health_goal') or 'not specified'}
+- Activity level: {profile.get('activity_level') or 'not specified'}
+- BMI: {profile.get('bmi') or 'not specified'}"""
+        inventory_text = f"\nActive inventory JSON: {json.dumps(inventory_items or [])}" if inventory_items else ""
+        return f"""You are a clinical dietitian. Create a complete {days}-day meal plan tailored for a person with this health condition: {condition}.
+Available ingredients: {ingredients_text}
+{dietary_text}
+{cuisine_text}
+{units_text}
+Expiring items threshold: items within {expiring_warn_days} days of expiry should be prioritised.
+{profile_text}
+{inventory_text}
 
-Prioritise these available ingredients where sensible: {ingredients_text}.
-Each day must have breakfast, lunch, and dinner. Keep meals appropriate and safe for the condition
-(e.g. low-sugar/low-GI for diabetes, low-sodium for hypertension, heart-healthy fats for cardiac).
+Rules:
+1. Strictly adhere to the health condition and dietary preference.
+2. Prioritize expiring inventory items where sensible.
+3. Each day must include breakfast, lunch, dinner, and an optional snack.
+4. Every meal must include calories, protein, carbs, fats, ingredients, and step-by-step instructions.
+5. Return ONLY valid JSON, no markdown, no code fences.
 
-Return ONLY a JSON object (no markdown, no code blocks) with this exact structure:
+Return a JSON object with this exact structure:
 {{
   "week_plan": [
     {{
       "day": "Day 1",
-      "breakfast": {{"name": "...", "calories": 350, "ingredients": ["..."]}},
-      "lunch": {{"name": "...", "calories": 500, "ingredients": ["..."]}},
-      "dinner": {{"name": "...", "calories": 550, "ingredients": ["..."]}}
+      "breakfast": {{"name": "...", "calories": 350, "protein": 18, "carbs": 55, "fats": 10, "ingredients": ["..."], "instructions": ["..."], "cuisine": "...", "difficulty": "Easy"}},
+      "lunch": {{"name": "...", "calories": 500, "protein": 30, "carbs": 60, "fats": 16, "ingredients": ["..."], "instructions": ["..."], "cuisine": "...", "difficulty": "Medium"}},
+      "dinner": {{"name": "...", "calories": 550, "protein": 32, "carbs": 65, "fats": 18, "ingredients": ["..."], "instructions": ["..."], "cuisine": "...", "difficulty": "Medium"}},
+      "snack": {{"name": "...", "calories": 150, "protein": 8, "carbs": 20, "fats": 5, "ingredients": ["..."], "instructions": ["Prepare as a snack."], "cuisine": "...", "difficulty": "Easy"}}
     }}
-    // ... exactly {days} days
   ]
 }}"""
 

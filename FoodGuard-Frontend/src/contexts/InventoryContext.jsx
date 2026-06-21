@@ -18,7 +18,7 @@ export function InventoryProvider({ children }) {
       setItems(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err.message);
-      setItems([]); // no hardcoded fallback — show only the user's own data
+      setItems([]);
     } finally { setLoading(false); }
   }, [isAuthenticated]);
 
@@ -36,29 +36,32 @@ export function InventoryProvider({ children }) {
       setItems((p) => p.map((it) => (it.id === tempId ? (created || { ...payload, id: tempId }) : it)));
       return { ok: true };
     } catch (err) {
-      // Keep locally so user's entry is visible even if backend is down
       setItems((p) => p.map((it) => (it.id === tempId ? { ...payload, id: Date.now() } : it)));
       return { ok: true, offline: true };
     }
   };
 
   const updateItem = async (id, patch) => {
-    const prev = items;
-    setItems((p) => p.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+    setItems((p) => p.map((it) => (it.id === id || it._id === id ? { ...it, ...patch } : it)));
     try { await inventoryService.update(id, patch); return { ok: true }; }
     catch (err) { return { ok: true, offline: true }; }
   };
 
+  const consumeItem = async (id) => {
+    setItems((p) => p.map((it) => (it.id === id || it._id === id ? { ...it, status: 'consumed' } : it)));
+    try { await inventoryService.consume(id); await fetchItems(); return { ok: true }; }
+    catch (err) { await fetchItems(); return { ok: false, error: err.message }; }
+  };
+
   const removeItem = async (id) => {
-    const prev = items;
-    setItems((p) => p.filter((it) => it.id !== id));
-    try { await inventoryService.remove(id); return { ok: true }; }
-    catch (err) { return { ok: true, offline: true }; }
+    setItems((p) => p.filter((it) => it.id !== id && it._id !== id));
+    try { await inventoryService.remove(id); await fetchItems(); return { ok: true }; }
+    catch (err) { await fetchItems(); return { ok: false, error: err.message }; }
   };
 
   return (
     <InventoryContext.Provider
-      value={{ items, loading, error, refresh: fetchItems, addItem, updateItem, removeItem }}
+      value={{ items, loading, error, refresh: fetchItems, addItem, updateItem, consumeItem, removeItem }}
     >
       {children}
     </InventoryContext.Provider>

@@ -68,7 +68,7 @@ const enforceItemLimit = asyncHandler(async (req, res, next) => {
     ? (req.body.items.filter((i) => i && i.name && i.expiry).length || req.body.items.length)
     : 1;
 
-  const count = await Item.countDocuments({ user: req.user._id });
+  const count = await Item.countDocuments({ user: req.user._id, status: { $nin: ['consumed', 'wasted'] } });
   if (count + incoming > limit) {
     res.status(403);
     throw new Error(

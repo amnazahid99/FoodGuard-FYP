@@ -59,7 +59,11 @@ export function NutritionInsights() {
     }
   };
 
-  const cardStyle = { background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: c.cardShadow };
+  const cardStyle = { 
+    background: c.cardBg, 
+    border: `1px solid ${c.border}`, 
+    boxShadow: c.elevatedShadow 
+  };
 
   const totals = log?.totals || {};
   const targets = log?.dailyTargets || { calories: 2000, protein_g: 50, carbs_g: 275, fat_g: 70 };
@@ -71,10 +75,10 @@ export function NutritionInsights() {
     : 0;
 
   const stats = [
-    { label: "Today's Calories", value: cals.toLocaleString(),      unit: 'kcal', icon: Zap,        color: '#1ABC9C' },
-    { label: 'Water Intake',      value: '2.4',                      unit: 'L',    icon: Droplets,   color: '#3b82f6' },
-    { label: 'Weekly Avg',        value: weeklyAvg.toLocaleString(), unit: 'kcal', icon: TrendingUp, color: '#f59e0b' },
-    { label: 'Health Score',      value: String(scorePct),           unit: '/100', icon: Activity,   color: '#8b5cf6' },
+    { label: "Today's Calories", value: cals.toLocaleString(),      unit: 'kcal', icon: Zap,        color: c.teal },
+    { label: 'Water Intake',      value: '2.4',                      unit: 'L',    icon: Droplets,   color: c.statusInfo },
+    { label: 'Weekly Avg',        value: weeklyAvg.toLocaleString(), unit: 'kcal', icon: TrendingUp, color: c.statusWarning },
+    { label: 'Health Score',      value: String(scorePct),           unit: '/100', icon: Activity,   color: c.statusFresh },
   ];
 
   const goalCals = targets.calories || 2000;
@@ -83,13 +87,13 @@ export function NutritionInsights() {
   if (!calorieData.length) calorieData = [{ day: 'Today', calories: cals, goal: goalCals }];
 
   const macros = [
-    { name: 'Protein', value: round(totals.protein_g), goal: round(targets.protein_g || 50),  color: '#1ABC9C' },
-    { name: 'Carbs',   value: round(totals.carbs_g),   goal: round(targets.carbs_g || 275),   color: '#3b82f6' },
-    { name: 'Fat',     value: round(totals.fat_g),     goal: round(targets.fat_g || 70),      color: '#f59e0b' },
-    { name: 'Fiber',   value: round(totals.fiber_g),   goal: 25,                              color: '#8b5cf6' },
+    { name: 'Protein', value: round(totals.protein_g), goal: round(targets.protein_g || 50),  color: c.statusFresh },
+    { name: 'Carbs',   value: round(totals.carbs_g),   goal: round(targets.carbs_g || 275),   color: c.statusInfo },
+    { name: 'Fat',     value: round(totals.fat_g),     goal: round(targets.fat_g || 70),      color: c.statusWarning },
+    { name: 'Fiber',   value: round(totals.fiber_g),   goal: 25,                              color: '#8B5CF6' },
   ].map(m => ({ ...m, fill: m.goal > 0 ? Math.min(100, Math.round((m.value / m.goal) * 100)) : 0 }));
 
-  const healthScoreData = [{ name: 'Score', value: scorePct, fill: '#1ABC9C' }];
+  const healthScoreData = [{ name: 'Score', value: scorePct, fill: c.teal }];
   const tips = log?.tips || [];
 
   return (
@@ -150,24 +154,30 @@ export function NutritionInsights() {
             <h3 className="font-semibold mb-6" style={{ color: onCardPrimary }}>Weekly Calorie Intake</h3>
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={calorieData}>
-                <defs>
-                  <linearGradient id="calGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#1ABC9C" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#1ABC9C" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="goalGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="day" tick={{ fill: '#A8B2C1', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#A8B2C1', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ background: '#0D1B2A', border: '1px solid rgba(26,188,156,0.2)', borderRadius: 8, color: '#fff', fontSize: 12 }}
-                />
-                <Area type="monotone" dataKey="goal"     stroke="#3b82f6" strokeWidth={1.5} fill="url(#goalGrad)" strokeDasharray="4 4" />
-                <Area type="monotone" dataKey="calories" stroke="#1ABC9C" strokeWidth={2}   fill="url(#calGrad)" />
+<defs>
+                    <linearGradient id="calGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor={c.teal} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={c.teal} stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="goalGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor={c.statusInfo} stopOpacity={0.15} />
+                      <stop offset="95%" stopColor={c.statusInfo} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                 <CartesianGrid strokeDasharray="3 3" stroke={isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)'} />
+                 <XAxis dataKey="day" tick={{ fill: onCardSecondary, fontSize: 12 }} axisLine={false} tickLine={false} />
+                 <YAxis tick={{ fill: onCardSecondary, fontSize: 11 }} axisLine={false} tickLine={false} />
+                 <Tooltip
+                   contentStyle={{ 
+                     background: isDark ? '#0D1B2A' : c.cardBg, 
+                     border: `1px solid ${c.border}`, 
+                     borderRadius: 8, 
+                     color: isDark ? '#fff' : c.textPrimary, 
+                     fontSize: 12 
+                   }}
+                 />
+<Area type="monotone" dataKey="goal"     stroke={c.statusInfo} strokeWidth={1.5} fill="url(#goalGrad)" strokeDasharray="4 4" />
+                  <Area type="monotone" dataKey="calories" stroke={c.teal} strokeWidth={2}   fill="url(#calGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           </motion.div>
@@ -181,7 +191,7 @@ export function NutritionInsights() {
             <h3 className="font-semibold mb-4" style={{ color: onCardPrimary }}>Health Score</h3>
             <ResponsiveContainer width="100%" height={160}>
               <RadialBarChart cx="50%" cy="50%" innerRadius="60%" outerRadius="90%" barSize={12} data={healthScoreData} startAngle={180} endAngle={-180}>
-                <RadialBar background={{ fill: 'rgba(255,255,255,0.05)' }} dataKey="value" fill="#1ABC9C" cornerRadius={10} />
+                <RadialBar background={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} dataKey="value" fill={c.teal} cornerRadius={10} />
               </RadialBarChart>
             </ResponsiveContainer>
             <div className="text-center -mt-6">

@@ -1,12 +1,26 @@
 const asyncHandler = require('express-async-handler');
 const fs = require('fs');
 const Item = require('../models/InventoryItem');
+const Alert = require('../models/Alert');
 const { aiPost } = require('../utils/aiClient');
 
 const DAY = 86400000;
+const ACTIVE_STATUSES = { $nin: ['consumed', 'wasted'] };
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+
+async function cleanupOrphanAlerts(userId) {
+  const activeItemIds = await Item.find({ user: userId }).distinct('_id');
+  if (activeItemIds.length) {
+    await Alert.deleteMany({ user: userId, item: { $nin: activeItemIds } });
+  } else {
+    await Alert.deleteMany({ user: userId, item: { $ne: null } });
+  }
+}
 
 exports.list = asyncHandler(async (req, res) => {
-  const items = await Item.find({ user: req.user._id }).sort({ expiry: 1 });
+  const items = await Item.find({ user: req.user._id, status: ACTIVE_STATUSES }).sort({ expiry: 1 });
+  await cleanupOrphanAlerts(req.user._id);
   res.json({ items });
 });
 
@@ -21,7 +35,7 @@ exports.create = asyncHandler(async (req, res) => {
 
 exports.update = asyncHandler(async (req, res) => {
   const item = await Item.findOneAndUpdate(
-    { _id: req.params.id, user: req.user._id },
+    { _id: req.params.id, user: req.user._id, status: ACTIVE_STATUSES },
     req.body,
     { new: true }
   );
@@ -29,13 +43,26 @@ exports.update = asyncHandler(async (req, res) => {
   res.json({ item });
 });
 
+exports.consume = asyncHandler(async (req, res) => {
+  const item = await Item.findOneAndUpdate(
+    { _id: req.params.id, user: req.user._id, status: ACTIVE_STATUSES },
+    { $set: { status: 'consumed', consumedAt: new Date() } },
+    { new: true }
+  );
+  if (!item) { res.status(404); throw new Error('Item not found'); }
+  await Alert.deleteMany({ user: req.user._id, item: item._id });
+  await cleanupOrphanAlerts(req.user._id);
+  res.json({ item });
+});
+
 exports.remove = asyncHandler(async (req, res) => {
   const item = await Item.findOneAndDelete({ _id: req.params.id, user: req.user._id });
   if (!item) { res.status(404); throw new Error('Item not found'); }
-  res.json({ message: 'Removed' });
+  await Alert.deleteMany({ user: req.user._id, item: item._id });
+  await cleanupOrphanAlerts(req.user._id);
+  res.status(204).send();
 });
 
-// Bulk insert — used after the user confirms scanned receipt items
 exports.bulkCreate = asyncHandler(async (req, res) => {
   const { items } = req.body;
   if (!Array.isArray(items) || !items.length) { res.status(400); throw new Error('items array required'); }
@@ -57,10 +84,18 @@ exports.bulkCreate = asyncHandler(async (req, res) => {
   res.status(201).json({ items: created });
 });
 
-// FEATURE 1 — OCR receipt scan. Parses items via AI but does NOT save
-// (frontend shows a confirmation modal, then calls POST /inventory/bulk).
 exports.scanReceipt = asyncHandler(async (req, res) => {
   if (!req.file) { res.status(400); throw new Error('No image uploaded'); }
+
+  const mimeType = String(req.file.mimetype || '').toLowerCase();
+  if (!ALLOWED_IMAGE_TYPES.has(mimeType)) {
+    res.status(400);
+    throw new Error('Only jpg, jpeg, png, and webp images are allowed.');
+  }
+  if (req.file.size > MAX_IMAGE_SIZE) {
+    res.status(400);
+    throw new Error('Image is too large. Maximum size is 10MB.');
+  }
 
   let image_data;
   try {
@@ -69,14 +104,17 @@ exports.scanReceipt = asyncHandler(async (req, res) => {
     fs.unlink(req.file.path, () => {});
     res.status(400); throw new Error('Could not read the uploaded image. Please try again.');
   }
-  const mime_type = req.file.mimetype || 'image/jpeg';
+
+  console.log('[OCR] scan-receipt start', { mimeType, size: req.file.size, base64Length: image_data.length });
 
   let data;
   try {
-    data = await aiPost('/ai/scan-receipt', { image_data, mime_type });
+    data = await aiPost('/ai/scan-receipt', { image_data, mime_type: mimeType }, { timeout: 90000, retries: 3 });
   } finally {
-    fs.unlink(req.file.path, () => {}); // always clean up temp upload
+    fs.unlink(req.file.path, () => {});
   }
+
+  console.log('[OCR] scan-receipt success', { itemsCount: (data.items || []).length });
 
   const now = Date.now();
   const items = (data.items || []).map((it) => {
@@ -95,10 +133,9 @@ exports.scanReceipt = asyncHandler(async (req, res) => {
   res.json({ items, rawText: data.raw_text || '' });
 });
 
-// FEATURE 7 — weekly wastage report
 exports.wastageReport = asyncHandler(async (req, res) => {
   const now = Date.now();
-  const items = await Item.find({ user: req.user._id });
+  const items = await Item.find({ user: req.user._id, status: ACTIVE_STATUSES });
   const expired = [];
   const expiringSoon = [];
   items.forEach((i) => {

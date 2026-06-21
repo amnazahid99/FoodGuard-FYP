@@ -62,15 +62,15 @@ export function Dashboard() {
     add: Plus, scan: ScanLine, recipe: ChefHat, check: CheckCircle2, bell: Bell,
   };
   const ACTIVITY_COLOR = {
-    add: c.teal, scan: '#3b82f6', recipe: '#a855f7', check: '#22c55e', bell: '#f59e0b',
+    add: c.primaryAccent, scan: c.statusInfo, recipe: '#A855F7', check: c.statusFresh, bell: c.statusWarning,
   };
 
   const s = data?.stats || {};
   const stats = [
     { label: 'Total Items',   value: String(s.totalItems   ?? 0), delta: s.deltas?.totalItems   ?? '',              Icon: Package,        iconColor: c.teal    },
-    { label: 'Expiring Soon', value: String(s.expiringSoon ?? 0), delta: s.deltas?.expiringSoon ?? 'Next 7 days',   Icon: Bell,           iconColor: '#f59e0b' },
-    { label: 'Fresh Items',   value: String(s.freshItems   ?? 0), delta: s.deltas?.freshItems   ?? '',              Icon: TrendingUp,     iconColor: '#22c55e' },
-    { label: 'Expired',       value: String(s.expired      ?? 0), delta: s.deltas?.expired      ?? 'Action needed', Icon: AlertTriangle,  iconColor: '#ef4444' },
+    { label: 'Expiring Soon', value: String(s.expiringSoon ?? 0), delta: s.deltas?.expiringSoon ?? 'Next 7 days',   Icon: Bell,           iconColor: c.statusWarning },
+    { label: 'Fresh Items',   value: String(s.freshItems   ?? 0), delta: s.deltas?.freshItems   ?? '',              Icon: TrendingUp,     iconColor: c.statusFresh },
+    { label: 'Expired',       value: String(s.expired      ?? 0), delta: s.deltas?.expired      ?? 'Action needed', Icon: AlertTriangle,  iconColor: c.statusError },
   ];
 
   const inventoryBreakdown = data?.inventoryBreakdown || [];
@@ -85,20 +85,20 @@ export function Dashboard() {
   }));
 
   const statusBg = {
-    critical: 'rgba(239,68,68,0.12)',
-    warning:  'rgba(245,158,11,0.12)',
-    good:     'rgba(34,197,94,0.12)',
+    critical: c.statusErrorBg,
+    warning:  c.statusWarningBg,
+    good:     c.statusFreshBg,
   };
   const statusColor = {
-    critical: '#ef4444',
-    warning:  '#f59e0b',
-    good:     '#22c55e',
+    critical: c.statusError,
+    warning:  c.statusWarning,
+    good:     c.statusFresh,
   };
 
   const cardBase = {
     background: c.cardBg,
     border: `1px solid ${c.border}`,
-    boxShadow: c.cardShadow,
+    boxShadow: c.elevatedShadow,
   };
   const onCardPrimary = isDark ? c.textPrimary : c.textOnCardPrimary;
   const onCardSecondary = isDark ? c.textSecondary : c.textOnCardSecondary;
@@ -128,19 +128,23 @@ export function Dashboard() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Link to="/inventory">
-              <button
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold transition-transform hover:scale-105"
+              <motion.span
+                whileHover={{ scale: 1.04, boxShadow: `0 6px 20px ${c.primaryAccentSubtle}` }}
+                whileTap={{ scale: 0.97 }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all cursor-pointer"
                 style={{
-                  background: `linear-gradient(135deg, ${c.teal}, ${c.tealHover})`,
-                  boxShadow: `0 4px 14px ${c.teal}55`,
+                  background: `linear-gradient(135deg, ${c.primaryAccent}, ${c.deepForest})`,
+                  boxShadow: `0 4px 14px ${c.primaryAccentSubtle}`,
                 }}
               >
                 <Plus className="w-4 h-4" /> Add Item
-              </button>
+              </motion.span>
             </Link>
             <Link to="/ai-meals">
-              <button
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+              <motion.span
+                whileHover={{ scale: 1.04, boxShadow: `0 6px 20px ${c.tealGlow}` }}
+                whileTap={{ scale: 0.97 }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer"
                 style={{
                   background: c.tagBg,
                   color: c.teal,
@@ -148,7 +152,7 @@ export function Dashboard() {
                 }}
               >
                 <Sparkles className="w-4 h-4" /> AI Meals
-              </button>
+              </motion.span>
             </Link>
           </div>
         </motion.div>
@@ -217,53 +221,53 @@ export function Dashboard() {
             </div>
             <ResponsiveContainer width="100%" height={240}>
               <AreaChart data={weeklyTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="savedGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={c.teal} stopOpacity={0.5} />
-                    <stop offset="100%" stopColor={c.teal} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="wastedGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ef4444" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={c.divider} vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  stroke={onCardSecondary}
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke={onCardSecondary}
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: isDark ? '#0D1B2A' : '#0D2137',
-                    border: `1px solid ${c.border}`,
-                    borderRadius: 8,
-                    color: '#fff',
-                    fontSize: 12,
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="saved"
-                  stroke={c.teal}
-                  strokeWidth={2}
-                  fill="url(#savedGrad)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="wasted"
-                  stroke="#ef4444"
-                  strokeWidth={2}
-                  fill="url(#wastedGrad)"
-                />
+<defs>
+                   <linearGradient id="savedGrad" x1="0" y1="0" x2="0" y2="1">
+                     <stop offset="0%" stopColor={c.teal} stopOpacity={0.5} />
+                     <stop offset="100%" stopColor={c.teal} stopOpacity={0} />
+                   </linearGradient>
+<linearGradient id="wastedGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={c.statusError} stopOpacity={0.4} />
+                      <stop offset="100%" stopColor={c.statusError} stopOpacity={0} />
+                    </linearGradient>
+                 </defs>
+                 <CartesianGrid strokeDasharray="3 3" stroke={c.divider} vertical={false} />
+                 <XAxis
+                   dataKey="day"
+                   stroke={onCardSecondary}
+                   fontSize={11}
+                   tickLine={false}
+                   axisLine={false}
+                 />
+                 <YAxis
+                   stroke={onCardSecondary}
+                   fontSize={11}
+                   tickLine={false}
+                   axisLine={false}
+                 />
+                 <Tooltip
+                   contentStyle={{
+                     background: isDark ? '#0D1B2A' : c.cardBg,
+                     border: `1px solid ${c.border}`,
+                     borderRadius: 8,
+                     color: isDark ? '#FFFFFF' : c.textPrimary,
+                     fontSize: 12,
+                   }}
+                 />
+                 <Area
+                   type="monotone"
+                   dataKey="saved"
+                   stroke={c.teal}
+                   strokeWidth={2}
+                   fill="url(#savedGrad)"
+                 />
+<Area
+                    type="monotone"
+                    dataKey="wasted"
+                    stroke={c.statusError}
+                    strokeWidth={2}
+                    fill="url(#wastedGrad)"
+                  />
               </AreaChart>
             </ResponsiveContainer>
           </motion.div>
@@ -299,10 +303,10 @@ export function Dashboard() {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    background: isDark ? '#0D1B2A' : '#0D2137',
+                    background: isDark ? '#0D1B2A' : c.cardBg,
                     border: `1px solid ${c.border}`,
                     borderRadius: 8,
-                    color: '#fff',
+                    color: isDark ? '#FFFFFF' : c.textPrimary,
                     fontSize: 12,
                   }}
                 />
@@ -481,15 +485,16 @@ export function Dashboard() {
                       </div>
                     </div>
                   </div>
-                  <span
-                    className="px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ml-2"
-                    style={{
-                      background: statusBg[item.status],
-                      color: statusColor[item.status],
-                    }}
-                  >
-                    {item.days} {item.days === 1 ? 'day' : 'days'}
-                  </span>
+<span
+                            className="px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ml-2 transition-all"
+                            style={{
+                              background: statusBg[item.status],
+                              color: statusColor[item.status],
+                              border: `1px solid ${statusColor[item.status]}33`,
+                            }}
+                          >
+                            {item.days} {item.days === 1 ? 'day' : 'days'}
+                          </span>
                 </div>
               ))}
             </div>

@@ -109,7 +109,7 @@ FoodGuard is **deployed and live** as three independent services:
 2. **Frontend** sends requests to Express Backend
 3. **Backend** processes business logic and interacts with MongoDB
 4. **Backend** calls FastAPI AI Service for intelligent features
-5. **AI Service** uses **Groq** (LLM for meals/nutrition/chatbot **and** vision for OCR by default). Fireworks/Gemini are used for OCR only when their keys are set, so a **single `GROQ_API_KEY` powers everything**.
+5. **AI Service** uses **Fireworks AI** as the primary OCR vision model for receipt scanning, with **Groq vision** as automatic fallback. The OCR pipeline includes client-side image preprocessing (resize + compress), 4 retry attempts with 90s timeout, strict JSON prompt engineering, and robust response parsing.
 
 > 💡 If the AI service is unreachable, the backend returns a clean **503** with a friendly message (never a crash or fake data). Rule-based features (BMI, wastage report) work even without any AI key.
 
@@ -149,8 +149,8 @@ FoodGuard is **deployed and live** as three independent services:
 | Python 3.11–3.13 (**3.12 recommended**) | Runtime — note: 3.14 is **not** supported yet (deps won't build) |
 | FastAPI | Web Framework |
 | Uvicorn | ASGI Server |
-| Groq | LLM (Llama-3.3) **+ Llama-4 Scout vision for OCR** |
-| Fireworks AI | OCR vision model (optional — used if `FIREWORKS_API_KEY` set) |
+| Groq | LLM (Llama-3.3) for meals/nutrition/chatbot **+ fallback OCR vision** |
+| Fireworks AI | **Primary OCR vision model** for receipt scanning (kimi-k2p5) |
 | Google Gemini | Optional vision/text AI |
 | Pydantic | Data Validation |
 
@@ -258,9 +258,9 @@ Final Project-updated/
 
 ### Required Accounts
 
-1. **Groq** — https://console.groq.com (**free, the only required key** — powers meals + OCR)
-2. **MongoDB Atlas** (optional locally, required for cloud) — https://www.mongodb.com/cloud/atlas
-3. **Fireworks AI** (optional) — https://fireworks.ai (only if you prefer Fireworks over Groq for OCR)
+1. **Fireworks AI** — https://fireworks.ai (**primary OCR** — required for best receipt scanning accuracy)
+2. **Groq** — https://console.groq.com (**free, required** — powers meals, nutrition, chatbot, and OCR fallback)
+3. **MongoDB Atlas** (optional locally, required for cloud) — https://www.mongodb.com/cloud/atlas
 4. **Google Gemini** (optional) — https://aistudio.google.com/app/apikey
 5. **Spoonacular** (optional) — https://spoonacular.com/food-api (richer recipe data)
 6. **CalorieNinjas** (optional) — https://calorieninjas.com/api (nutrition lookups)
@@ -325,12 +325,14 @@ VITE_API_URL=http://localhost:5001/api
 Update `FoodGuard-AI/.env`:
 
 ```env
-# Groq API — the ONLY required key (powers meals, nutrition, chatbot, AND OCR).
-# Without it, AI endpoints return a clean 503; BMI & wastage still work.
+# Fireworks API — primary OCR vision model for receipt scanning.
+# Without it, OCR falls back to Groq vision automatically.
+FIREWORKS_API_KEY=your-fireworks-api-key
+
+# Groq API — powers meals, nutrition, chatbot, AND fallback OCR.
+# Required for non-OCR AI features.
 GROQ_API_KEY=your-groq-api-key
 
-# Optional — Fireworks is used for OCR only if set (otherwise Groq vision is used)
-FIREWORKS_API_KEY=
 # Optional extras
 GEMINI_API_KEY=
 SPOONACULAR_API_KEY=

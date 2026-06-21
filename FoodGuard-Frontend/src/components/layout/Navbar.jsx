@@ -66,8 +66,8 @@ export function Navbar() {
   const { logout, isAuthenticated, user } = useAuth();
   const { c } = useTheme();
 
-  const navText       = '#FFFFFF';
-  const navTextStrong = '#FFFFFF';
+  const navText       = c.navText || '#FFFFFF';
+  const navTextStrong = c.textPrimary || c.logoBrandColor || '#FFFFFF';
 
   const NAV_LINKS = isAuthenticated ? AUTH_LINKS : PUBLIC_LINKS;
   const initials  = useMemo(() => getInitials(user), [user]);

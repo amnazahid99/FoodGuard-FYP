@@ -9,24 +9,19 @@ import {
   X,
   ScanLine,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
 import { useInventory } from '../contexts/InventoryContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import inventoryService from '../services/inventory.service';
+import inventoryService, { preprocessImage } from '../services/inventory.service';
 
 const categories = [
   'Grains', 'Legumes', 'Meat', 'Dairy', 'Vegetables',
   'Poultry', 'Bakery', 'Oils', 'Fruits', 'Snacks', 'Beverages', 'Other',
 ];
-
-const statusConfig = {
-  critical: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)', icon: AlertTriangle },
-  warning:  { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', icon: Clock },
-  good:     { color: '#1ABC9C', bg: 'rgba(26,188,156,0.12)', icon: CheckCircle },
-};
 
 function computeStatus(expiry) {
   const today = new Date();
@@ -42,11 +37,18 @@ const emptyForm = { name: '', category: 'Grains', qty: 1, expiry: '' };
 
 export function Inventory() {
   const { c, isDark } = useTheme();
-  const { items: rawItems, addItem, loading, refresh } = useInventory();
+  const { items: rawItems, addItem, consumeItem, removeItem, loading, refresh } = useInventory();
   const { notify } = useNotifications();
   const onCardPrimary   = isDark ? c.textPrimary   : c.textOnCardPrimary;
   const onCardSecondary = isDark ? c.textSecondary : c.textOnCardSecondary;
   const onCardMuted     = isDark ? c.textMuted     : (c.textOnCardMuted || c.textOnCardSecondary);
+
+  const statusConfig = {
+    critical: { color: c.statusError || '#B85C5C', bg: c.statusErrorBg || 'rgba(184,92,92,0.10)', label: 'Critical', icon: AlertTriangle },
+    warning:  { color: c.statusWarning || '#D4A94D', bg: c.statusWarningBg || 'rgba(212,169,77,0.12)', label: 'Warning',  icon: Clock },
+    info:     { color: c.statusInfo || '#5A7FAF', bg: c.statusInfoBg || 'rgba(90,127,175,0.10)', label: 'Soon',     icon: Clock },
+    good:     { color: c.statusFresh || '#2E8A74', bg: c.statusFreshBg || 'rgba(46,138,116,0.10)', label: 'Good',     icon: CheckCircle },
+  };
 
   // Derive status from expiry every render so dates stay live.
   const items = useMemo(
@@ -63,6 +65,7 @@ export function Inventory() {
   const fileRef = useRef(null);
   const [showScan, setShowScan] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [scanStep, setScanStep] = useState('');
   const [parsed, setParsed] = useState([]);
   const [scanError, setScanError] = useState('');
   const [savingScan, setSavingScan] = useState(false);
@@ -73,15 +76,40 @@ export function Inventory() {
       i.category.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const getItemId = (item) => item._id || item.id;
+
+  const handleConsume = async (item) => {
+    if (!window.confirm(`Mark "${item.name}" as consumed? It will be removed from active inventory and expiry alerts.`)) return;
+    const result = await consumeItem(getItemId(item));
+    if (result?.ok) notify(`${item.name} marked consumed`, 'success');
+    else notify(result?.error || `Could not mark ${item.name} as consumed.`, 'error');
+  };
+
+  const handleRemove = async (item) => {
+    if (!window.confirm(`Remove "${item.name}" from inventory? This cannot be undone.`)) return;
+    const result = await removeItem(getItemId(item));
+    if (result?.ok) notify(`${item.name} removed`, 'success');
+    else notify(result?.error || `Could not remove ${item.name}.`, 'error');
+  };
+
+  const formatScanError = (err) => {
+    const message = err?.message || '';
+    if (/network|timeout|failed to fetch/i.test(message)) return 'Network issue while scanning. Check your connection and try again.';
+    if (/Only jpg|webp|png|too large|max 10MB|valid base64|No image|OCR failed|OCR service failed|Could not fetch|Provide image/i.test(message)) return message;
+    if (/AI service is temporarily unavailable/i.test(message)) return 'AI service is temporarily unavailable. Please try again';
+    if (/OCR|receipt|No items|server error/i.test(message)) return 'OCR failed to extract receipt items. Try a clearer image.';
+    return 'Could not scan receipt. Please try again.';
+  };
+
   const chartData = useMemo(() => {
     const counts = { good: 0, warning: 0, critical: 0 };
     items.forEach((i) => {
       counts[i.status] += 1;
     });
     return [
-      { name: 'Good',     value: counts.good,     color: '#1ABC9C' },
-      { name: 'Warning',  value: counts.warning,  color: '#f59e0b' },
-      { name: 'Critical', value: counts.critical, color: '#ef4444' },
+      { name: 'Good',     value: counts.good,     color: c.statusFresh || '#2E8A74' },
+      { name: 'Warning',  value: counts.warning,  color: c.statusWarning || '#D4A94D' },
+      { name: 'Critical', value: counts.critical, color: c.statusError || '#B85C5C' },
     ];
   }, [items]);
 
@@ -147,17 +175,33 @@ export function Inventory() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    setScanning(true); setScanError(''); setParsed([]); setShowScan(true);
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setScanError('Only jpg, jpeg, png, and webp images are allowed.');
+      setShowScan(true);
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setScanError('Image is too large. Maximum size is 10MB.');
+      setShowScan(true);
+      return;
+    }
+    setScanning(true); setScanError(''); setParsed([]); setScanStep('Uploading'); setShowScan(true);
     try {
+      const processed = await preprocessImage(file);
+      setScanStep('Processing');
       const fd = new FormData();
-      fd.append('image', file);
+      fd.append('image', processed);
       const result = await inventoryService.scanReceipt(fd);
+      setScanStep('Extracting');
+      await new Promise(r => setTimeout(r, 400));
+      setScanStep('Completed');
       setParsed((result || []).map((it) => ({
         ...it, include: true, expiry: (it.expiry || '').slice(0, 10),
       })));
       if (!result || !result.length) setScanError('No items detected. Try a clearer photo.');
     } catch (err) {
-      setScanError(err.message || 'Could not scan receipt.');
+      setScanError(formatScanError(err));
     } finally {
       setScanning(false);
     }
@@ -183,7 +227,7 @@ export function Inventory() {
       })));
       await refresh?.();
       notify(`${toSave.length} item(s) added from receipt`, 'success');
-      setShowScan(false); setParsed([]);
+      setShowScan(false); setParsed([]); setScanStep('');
     } catch (err) {
       setScanError(err.message || 'Could not save items.');
     } finally {
@@ -194,13 +238,20 @@ export function Inventory() {
   const cardStyle = {
     background: c.cardBg,
     border: `1px solid ${c.border}`,
-    boxShadow: c.cardShadow,
+    boxShadow: c.elevatedShadow,
   };
 
   const inputStyle = {
     background: c.inputBg,
     border: `1px solid ${c.inputBorder}`,
     color: c.inputText || '#FFFFFF',
+  };
+
+  // Modal card style with premium shadow
+  const modalCardStyle = {
+    background: c.cardBg,
+    border: `1px solid ${c.border}`,
+    boxShadow: '0 24px 60px rgba(0,0,0,0.15)',
   };
 
   return (
@@ -222,35 +273,58 @@ export function Inventory() {
                 <Package className="w-5 h-5" style={{ color: c.teal }} />
               </div>
               <h1
-                className="text-3xl font-bold"
-                style={{ color: c.textPrimary, fontFamily: 'Poppins, sans-serif' }}
+                className="text-3xl md:text-4xl font-bold"
+                style={{ color: c.textPrimary, fontFamily: 'Poppins, Inter, sans-serif' }}
               >
                 Inventory
               </h1>
             </div>
-            <p style={{ color: c.textSecondary }} className="text-sm">
+            <p style={{ color: c.textSecondary }} className="text-sm md:text-base">
               Manage your food stock, track quantities and statuses.
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleReceiptPick} />
-            <motion.button
-              onClick={() => fileRef.current?.click()}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold"
-              style={{ background: c.tagBg, color: c.teal, border: `1px solid ${c.border}` }}
-            >
-              <ScanLine className="w-4 h-4" /> Scan Receipt
-            </motion.button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div>
+              <input ref={fileRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" className="hidden" onChange={handleReceiptPick} />
+              <motion.button
+                onClick={() => fileRef.current?.click()}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ 
+                  background: c.tagBg, 
+                  color: c.teal, 
+                  border: `1px solid ${c.border}`,
+                }}
+                onMouseEnter={e => { 
+                  e.currentTarget.style.background = c.teal; 
+                  e.currentTarget.style.color = '#FFFFFF';
+                }}
+                onMouseLeave={e => { 
+                  e.currentTarget.style.background = c.tagBg; 
+                  e.currentTarget.style.color = c.teal;
+                }}
+              >
+                <ScanLine className="w-4 h-4" /> Scan Receipt
+              </motion.button>
+              <p className="text-[11px] mt-1.5" style={{ color: onCardMuted }}>
+                Supports JPG, PNG, WEBP — max 10MB
+              </p>
+            </div>
             <motion.button
               onClick={openModal}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all"
               style={{
-                background: 'linear-gradient(135deg,#1ABC9C,#0e9c80)',
-                boxShadow: '0 4px 20px rgba(26,188,156,0.35)',
+                background: `linear-gradient(135deg, ${c.primaryAccent}, ${c.deepForest})`,
+                boxShadow: `0 4px 14px ${c.primaryAccentSubtle}`,
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.boxShadow = `0 6px 20px ${c.primaryAccentSubtle}`;
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.boxShadow = `0 4px 14px ${c.primaryAccentSubtle}`;
               }}
             >
               <Plus className="w-4 h-4" /> Add Food Item
@@ -298,50 +372,108 @@ export function Inventory() {
                   const cfg = statusConfig[item.status];
                   const Icon = cfg.icon;
                   return (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.04 * i }}
-                      className="flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center"
-                          style={{ background: cfg.bg }}
-                        >
-                          <Icon
-                            className="w-3.5 h-3.5"
-                            style={{ color: cfg.color }}
-                          />
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium" style={{ color: onCardPrimary }}>
-                            {item.name}
+<motion.div
+                       key={item.id}
+                       initial={{ opacity: 0 }}
+                       animate={{ opacity: 1 }}
+                       transition={{ delay: 0.04 * i }}
+                       className="flex items-center justify-between px-5 py-4 transition-all duration-200 rounded-xl"
+                       style={{ 
+                         backgroundColor: c.cardBg,
+                         borderBottom: `1px solid ${c.divider}`,
+                       }}
+                       onMouseEnter={e => {
+                         e.currentTarget.style.backgroundColor = c.cardBgHover;
+                         e.currentTarget.style.boxShadow = c.cardHoverShadow;
+                       }}
+                       onMouseLeave={e => {
+                         e.currentTarget.style.backgroundColor = c.cardBg;
+                         e.currentTarget.style.boxShadow = 'none';
+                       }}
+                     >
+                       <div className="flex items-center gap-3">
+                         <div
+                           className="w-8 h-8 rounded-lg flex items-center justify-center"
+                           style={{ background: cfg.bg }}
+                         >
+                           <Icon
+                             className="w-3.5 h-3.5"
+                             style={{ color: cfg.color }}
+                           />
+                         </div>
+                         <div>
+                           <div className="text-sm font-medium" style={{ color: onCardPrimary }}>
+                             {item.name}
+                           </div>
+                           <div
+                             className="text-xs"
+                             style={{ color: onCardSecondary }}
+                           >
+                             {item.category} · Qty: {item.qty}
+                           </div>
+                         </div>
+                       </div>
+                       <div className="text-right">
+                         <div
+                           className="text-xs mb-1"
+                           style={{ color: onCardSecondary }}
+                         >
+                           {item.expiry}
+                         </div>
+                         <span
+                           className="px-3 py-1 rounded-full text-xs font-semibold capitalize inline-block"
+                           style={{ 
+                             background: cfg.bg, 
+                             color: cfg.color,
+                             border: `1px solid ${cfg.color}33`,
+                           }}
+                         >
+                           {cfg.label}
+                         </span>
+<div className="flex items-center justify-end gap-2 mt-2">
+                            <button
+                              type="button"
+                              onClick={() => handleConsume(item)}
+                              className="px-3 py-1 rounded-lg text-xs font-semibold transition-all"
+                              style={{ 
+                                background: c.statusFreshBg, 
+                                color: c.statusFresh, 
+                                border: `1px solid ${c.statusFresh}33`,
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.background = 'rgba(46,138,116,0.18)';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = c.statusFreshBg;
+                                e.currentTarget.style.transform = 'translateY(0)';
+                              }}
+                            >
+                              Mark Consumed
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemove(item)}
+                              className="px-3 py-1 rounded-lg text-xs font-semibold transition-all"
+                              style={{ 
+                                background: c.statusErrorBg, 
+                                color: c.statusError, 
+                                border: `1px solid ${c.statusError}33`,
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.background = 'rgba(184,92,92,0.18)';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = c.statusErrorBg;
+                                e.currentTarget.style.transform = 'translateY(0)';
+                              }}
+                            >
+                              <Trash2 className="w-3 h-3 inline mr-1" /> Remove
+                            </button>
                           </div>
-                          <div
-                            className="text-xs"
-                            style={{ color: onCardSecondary }}
-                          >
-                            {item.category} · Qty: {item.qty}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div
-                          className="text-xs mb-1"
-                          style={{ color: onCardSecondary }}
-                        >
-                          {item.expiry}
-                        </div>
-                        <span
-                          className="px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize"
-                          style={{ background: cfg.bg, color: cfg.color }}
-                        >
-                          {item.status}
-                        </span>
-                      </div>
-                    </motion.div>
+                       </div>
+                     </motion.div>
                   );
                 })}
                 {filtered.length === 0 && (
@@ -380,42 +512,34 @@ export function Inventory() {
                     <Cell key={index} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{
-                    background: '#0D1B2A',
-                    border: '1px solid rgba(26,188,156,0.2)',
-                    borderRadius: 8,
-                    color: '#fff',
-                    fontSize: 12,
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="space-y-2 mt-4">
-              {chartData.map((d) => (
-                <div
-                  key={d.name}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ background: d.color }}
-                    />
-                    <span
-                      className="text-sm"
-                      style={{ color: onCardSecondary }}
-                    >
-                      {d.name}
-                    </span>
-                  </div>
-                  <span className="text-sm font-medium" style={{ color: onCardPrimary }}>
-                    {d.value}
-                  </span>
+<Tooltip
+                   contentStyle={{
+                     background: isDark ? '#0D1B2A' : c.cardBg,
+                     border: `1px solid ${c.border}`,
+                     borderRadius: 8,
+                     color: isDark ? '#FFFFFF' : c.textPrimary,
+                     fontSize: 12,
+                   }}
+                 />
+               </PieChart>
+             </ResponsiveContainer>
+
+{/* Status Legend */}
+              <div className="flex items-center justify-center gap-6 mt-4 pt-3" style={{ borderTop: `1px solid ${c.divider}` }}>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ background: c.statusFresh }} />
+                  <span className="text-xs" style={{ color: onCardSecondary }}>Good</span>
                 </div>
-              ))}
-            </div>
-          </motion.div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ background: c.statusWarning }} />
+                  <span className="text-xs" style={{ color: onCardSecondary }}>Warning</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ background: c.statusError }} />
+                  <span className="text-xs" style={{ color: onCardSecondary }}>Critical</span>
+                </div>
+              </div>
+           </motion.div>
         </div>
       </div>
 
@@ -428,7 +552,7 @@ export function Inventory() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
-            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+            style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
             onClick={closeModal}
           >
             <motion.div
@@ -438,11 +562,7 @@ export function Inventory() {
               transition={{ duration: 0.2 }}
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-md rounded-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
-              style={{
-                background: c.cardBg,
-                border: `1px solid ${c.border}`,
-                boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-              }}
+              style={modalCardStyle}
             >
               {/* Header */}
               <div
@@ -608,7 +728,7 @@ export function Inventory() {
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
-            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+            style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
             onClick={() => !savingScan && setShowScan(false)}
           >
             <motion.div
@@ -617,7 +737,7 @@ export function Inventory() {
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-lg rounded-2xl overflow-hidden max-h-[90vh] flex flex-col"
-              style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+              style={{ ...modalCardStyle, background: c.cardBg }}
             >
               <div className="flex items-center justify-between px-5 sm:px-6 py-4" style={{ borderBottom: `1px solid ${c.divider}` }}>
                 <div className="flex items-center gap-3">
@@ -633,9 +753,25 @@ export function Inventory() {
 
               <div className="px-5 sm:px-6 py-5 overflow-y-auto">
                 {scanning ? (
-                  <div className="py-12 flex flex-col items-center gap-3" style={{ color: onCardSecondary }}>
-                    <Loader2 className="w-7 h-7 animate-spin" style={{ color: c.teal }} />
-                    <p className="text-sm">Reading your receipt with AI…</p>
+                  <div className="py-8">
+                    <div className="flex flex-col items-center gap-4 mb-5" style={{ color: onCardSecondary }}>
+                      <Loader2 className="w-8 h-8 animate-spin" style={{ color: c.teal }} />
+                      <p className="text-sm font-semibold">{scanStep === 'Uploading' ? 'Uploading receipt image…' : scanStep === 'Processing' ? 'Analyzing receipt with AI…' : scanStep === 'Extracting' ? 'Extracting food items…' : 'Processing…'}</p>
+                    </div>
+                    <div className="space-y-2">
+                      {['Uploading', 'Processing', 'Extracting', 'Completed'].map((step) => {
+                        const active = scanStep === step;
+                        const done = ['Uploading', 'Processing', 'Extracting', 'Completed'].indexOf(scanStep) > ['Uploading', 'Processing', 'Extracting', 'Completed'].indexOf(step);
+                        return (
+                          <div key={step} className="flex items-center gap-3 text-xs" style={{ color: active || done ? c.teal : onCardSecondary }}>
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: active || done ? `${c.teal}22` : c.inputBg, border: `1px solid ${active || done ? c.teal : c.inputBorder}` }}>
+                              {done ? '✓' : active ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : ''}
+                            </div>
+                            <span>{step}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -680,11 +816,19 @@ export function Inventory() {
 
               {!scanning && parsed.length > 0 && (
                 <div className="flex gap-3 px-5 sm:px-6 py-4" style={{ borderTop: `1px solid ${c.divider}` }}>
-                  <button onClick={() => setShowScan(false)} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium" style={{ background: 'transparent', border: `1px solid ${c.border}`, color: onCardPrimary }}>
+                  <button onClick={() => { setShowScan(false); setParsed([]); setScanError(''); setScanStep(''); }} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium" style={{ background: 'transparent', border: `1px solid ${c.border}`, color: onCardPrimary }}>
                     Cancel
                   </button>
                   <button onClick={handleSaveScanned} disabled={savingScan} className="flex-1 px-4 py-2.5 rounded-lg text-white text-sm font-semibold disabled:opacity-70" style={{ background: 'linear-gradient(135deg,#1ABC9C,#0e9c80)' }}>
                     {savingScan ? 'Adding…' : `Add ${parsed.filter((p) => p.include).length} item(s)`}
+                  </button>
+                </div>
+              )}
+
+              {!scanning && scanError && (
+                <div className="flex gap-3 px-5 sm:px-6 py-4" style={{ borderTop: `1px solid ${c.divider}` }}>
+                  <button onClick={() => { fileRef.current?.click(); }} className="flex-1 px-4 py-2.5 rounded-lg text-white text-sm font-semibold" style={{ background: 'linear-gradient(135deg,#1ABC9C,#0e9c80)' }}>
+                    <ScanLine className="w-4 h-4 inline mr-1" /> Scan Another Receipt
                   </button>
                 </div>
               )}

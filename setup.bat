@@ -4,6 +4,7 @@ REM  FoodGuard - one-time setup (installs all three services)
 REM  Double-click this once. Needs Python 3.11-3.13 + Node.js.
 REM ============================================================
 cd /d "%~dp0"
+set NODE_ENV=development
 echo === FoodGuard setup ===
 echo.
 
@@ -17,13 +18,13 @@ echo.
 
 echo [2/3] Backend - npm install...
 cd FoodGuard-Backend
-call npm install
+call npm install --include=dev
 cd ..
 echo.
 
 echo [3/3] Frontend - npm install...
 cd FoodGuard-Frontend
-call npm install
+call npm install --include=dev
 cd ..
 echo.
 

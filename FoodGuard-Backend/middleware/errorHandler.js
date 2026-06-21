@@ -33,7 +33,7 @@ module.exports = (err, _req, res, _next) => {
     status = 400;
     message = err.code === 'LIMIT_FILE_SIZE'
       ? 'Image is too large (max 10MB).'
-      : `Upload error: ${err.message}`;
+      : 'Only jpg, jpeg, png, and webp images are allowed.';
   }
 
   // Never report a 4xx client error as a 500.

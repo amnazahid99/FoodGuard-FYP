@@ -6,13 +6,6 @@ import { useInventory } from '../contexts/InventoryContext';
 import { useMemo, useState, useEffect } from 'react';
 import alertsService from '../services/alerts.service';
 
-const statusConfig = {
-  critical: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)', label: 'Critical', icon: AlertTriangle },
-  warning:  { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', label: 'Warning',  icon: Clock },
-  info:     { color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', label: 'Soon',     icon: Clock },
-  good:     { color: '#1ABC9C', bg: 'rgba(26,188,156,0.12)', label: 'Good',     icon: CheckCircle },
-};
-
 function daysUntil(dateStr) {
   if (!dateStr) return Infinity;
   const d = new Date(dateStr);
@@ -25,6 +18,13 @@ export function ExpiryAlerts() {
   const { items } = useInventory();
   const onCardPrimary   = isDark ? c.textPrimary   : c.textOnCardPrimary;
   const onCardSecondary = isDark ? c.textSecondary : c.textOnCardSecondary;
+
+  const statusConfig = {
+    critical: { color: c.statusError || '#B85C5C', bg: c.statusErrorBg || 'rgba(184,92,92,0.10)', label: 'Critical', icon: AlertTriangle },
+    warning:  { color: c.statusWarning || '#D4A94D', bg: c.statusWarningBg || 'rgba(212,169,77,0.12)', label: 'Warning',  icon: Clock },
+    info:     { color: c.statusInfo || '#5A7FAF', bg: c.statusInfoBg || 'rgba(90,127,175,0.10)', label: 'Soon',     icon: Clock },
+    good:     { color: c.statusFresh || '#2E8A74', bg: c.statusFreshBg || 'rgba(46,138,116,0.10)', label: 'Good',     icon: CheckCircle },
+  };
 
   const [apiAlerts, setApiAlerts] = useState(null);
   const [dismissed, setDismissed] = useState(() => new Set());
@@ -91,15 +91,16 @@ export function ExpiryAlerts() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">
           {[
-            { label: 'Critical', count: critical, color: '#ef4444' },
-            { label: 'Warning',  count: warning,  color: '#f59e0b' },
-            { label: 'Good',     count: good,     color: '#1ABC9C' },
+            { label: 'Critical', count: critical, color: c.statusError },
+            { label: 'Warning',  count: warning,  color: c.statusWarning },
+            { label: 'Good',     count: good,     color: c.statusFresh },
           ].map((s) => (
             <motion.div
               key={s.label}
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}
-              className="rounded-xl p-5 text-center"
+              className="rounded-xl p-5 text-center transition-all duration-200"
               style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: c.cardShadow }}
+              whileHover={{ boxShadow: c.cardHoverShadow }}
             >
               <div className="text-3xl font-bold mb-1" style={{ color: s.color }}>{s.count}</div>
               <div className="text-sm" style={{ color: onCardSecondary }}>{s.label}</div>
@@ -111,7 +112,7 @@ export function ExpiryAlerts() {
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
           className="rounded-2xl overflow-hidden"
-          style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: c.cardShadow }}
+          style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: c.elevatedShadow }}
         >
           <div className="px-6 py-4 border-b" style={{ borderColor: c.divider }}>
             <h2 className="font-semibold flex items-center gap-2" style={{ color: onCardPrimary }}>
@@ -126,7 +127,16 @@ export function ExpiryAlerts() {
                 <motion.div
                   key={alert.id}
                   initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 * i }}
-                  className="px-6 py-4 hover:bg-white/[0.02] transition-colors"
+                  className="px-6 py-4 rounded-xl transition-all duration-200"
+                  style={{ backgroundColor: c.cardBg }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = c.cardBgHover;
+                    e.currentTarget.style.boxShadow = c.cardHoverShadow;
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = c.cardBg;
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4 min-w-0">
@@ -139,12 +149,19 @@ export function ExpiryAlerts() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      <div className="px-3 py-1 rounded-full text-xs font-semibold" style={{ background: cfg.bg, color: cfg.color }}>
+                      <span
+                        className="px-3 py-1 rounded-full text-xs font-semibold transition-all"
+                        style={{ 
+                          background: cfg.bg, 
+                          color: cfg.color,
+                          border: `1px solid ${cfg.color}33`,
+                        }}
+                      >
                         {alert.daysLeft <= 0 ? 'Expired' : `${alert.daysLeft}d left`}
-                      </div>
+                      </span>
                       <button
                         onClick={() => dismiss(alert.id)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
                         style={{ color: onCardSecondary }}
                         aria-label="Dismiss"
                       >
@@ -169,7 +186,7 @@ export function ExpiryAlerts() {
                         )}
                         <Link
                           to="/ai-meals"
-                          className="flex items-center gap-1 text-xs font-semibold"
+                          className="flex items-center gap-1 text-xs font-semibold transition-all hover:gap-2"
                           style={{ color: c.teal }}
                         >
                           <ChefHat className="w-3 h-3" /> Use in Recipe

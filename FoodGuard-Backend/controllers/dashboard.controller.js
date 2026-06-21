@@ -53,7 +53,7 @@ exports.overview = asyncHandler(async (req, res) => {
   const userId = req.user?._id || req.user?.id;
 
   // Filter inventory items by user ID - the InventoryItem model uses 'user' field
-  const items = await Item.find({ user: userId }).sort({ createdAt: -1 });
+  const items = await Item.find({ user: userId, status: { $nin: ['consumed', 'wasted'] } }).sort({ createdAt: -1 });
 
   const now = new Date();
   const day = 1000 * 60 * 60 * 24;

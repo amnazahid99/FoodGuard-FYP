@@ -16,6 +16,8 @@ const conditions = [
   { value: 'weight_loss', label: 'Weight Loss' },
 ];
 
+const AI_UNAVAILABLE_MESSAGE = 'AI service is temporarily unavailable. Please try again';
+
 export function AIMeals() {
   const [tab, setTab]                   = useState('recommend');
   const [queryText, setQueryText]       = useState('');
@@ -57,11 +59,17 @@ export function AIMeals() {
       setRecipes(list);
       if (result && result.quota) setQuota(result.quota);
     } catch (e) {
-      setError(e.message || 'Could not get recommendations.');
+      const message = e?.message || '';
+      setError(message.includes('AI service') ? AI_UNAVAILABLE_MESSAGE : (message || 'Could not get recommendations.'));
       setRecipes([]);
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const retryRecommendations = async () => {
+    await fetchRecommendations({ manual: true });
+    recipesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   // Auto-load recommendations on first visit
@@ -69,19 +77,21 @@ export function AIMeals() {
 
   // Load the saved meal plan when opening that tab
   useEffect(() => {
-    if (tab !== 'plan' || plan) return;
+    if (tab !== 'plan') return;
+    setPlanLoading(true);
+    setPlanError(null);
     (async () => {
       try {
         const p = await mealsService.getMealPlan();
         if (p) { setPlan(p); setPlanCondition(p.condition || 'none'); }
-      } catch (_) { /* no plan yet */ }
+      } catch (_) { setPlan(null); }
     })();
+    return () => {};
     /* eslint-disable-next-line */
   }, [tab]);
 
   const handleGetRecommendations = async () => {
-    await fetchRecommendations({ manual: true });
-    setTimeout(() => recipesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    await retryRecommendations();
   };
 
   const handleGeneratePlan = async () => {
@@ -91,7 +101,8 @@ export function AIMeals() {
       const p = await mealsService.generateMealPlan(planCondition);
       setPlan(p);
     } catch (e) {
-      setPlanError(e.message || 'Could not generate meal plan.');
+      const message = e?.message || '';
+      setPlanError(message.includes('AI service') ? AI_UNAVAILABLE_MESSAGE : (message || 'Could not generate meal plan.'));
     } finally {
       setPlanLoading(false);
     }
@@ -120,6 +131,29 @@ export function AIMeals() {
       <Icon className="w-4 h-4" /> {label}
     </button>
   );
+
+  const renderPlanMeal = (mealKey, meal) => {
+    if (!meal) return null;
+    const instructions = Array.isArray(meal.instructions) ? meal.instructions : (typeof meal.instructions === 'string' ? [meal.instructions] : []);
+    return (
+      <div className="mb-3 rounded-xl p-3" style={{ background: c.inlineCardBg, border: `1px solid ${c.inlineCardBorder}` }}>
+        <div className="text-xs uppercase tracking-wide mb-1" style={{ color: c.teal }}>{mealKey}</div>
+        <div className="text-sm font-medium" style={{ color: onCardPrimary }}>{meal.name}</div>
+        <div className="text-xs mt-1 flex flex-wrap gap-2" style={{ color: onCardSecondary }}>
+          <span><Flame className="w-3 h-3 inline mr-1" />{meal.calories || 0} kcal</span>
+          <span>P {Math.round(meal.protein || 0)}g</span>
+          <span>C {Math.round(meal.carbs || 0)}g</span>
+          <span>F {Math.round(meal.fats || 0)}g</span>
+        </div>
+        {meal.ingredients?.length ? (
+          <p className="text-xs mt-2" style={{ color: onCardMuted }}>Ingredients: {(meal.ingredients || []).slice(0, 5).join(', ')}</p>
+        ) : null}
+        {instructions.length ? (
+          <p className="text-xs mt-1" style={{ color: onCardMuted }}>Instructions: {instructions.slice(0, 2).join(' ')}</p>
+        ) : null}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen pt-28 pb-20 px-4 sm:px-6">
@@ -314,6 +348,11 @@ export function AIMeals() {
               <p className="text-sm">
                 {error ? error : 'No recommendations yet. Add ingredients to your inventory and click "Get AI Recommendations".'}
               </p>
+              {error && (
+                <button onClick={retryRecommendations} disabled={isAnalyzing} className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-70" style={{ background: c.teal, color: '#fff' }}>
+                  Retry
+                </button>
+              )}
             </div>
           )}
           {recipes.map((recipe, i) => (
@@ -381,10 +420,16 @@ export function AIMeals() {
                     ))}
                   </div>
                 ) : null}
-                <div className="flex items-center gap-4 text-xs mb-4" style={{ color: onCardSecondary }}>
+                <div className="grid grid-cols-2 gap-2 text-xs mb-4" style={{ color: onCardSecondary }}>
                   <span className="flex items-center gap-1"><Flame className="w-3 h-3" /> {recipe.calories || 0} kcal</span>
                   <span className="flex items-center gap-1">{Math.round(recipe.protein || 0)}g protein</span>
                   <span className="flex items-center gap-1">{Math.round(recipe.carbs || 0)}g carbs</span>
+                  <span className="flex items-center gap-1">{Math.round(recipe.fats || 0)}g fat</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs mb-4" style={{ color: onCardMuted }}>
+                  <span>Difficulty: {recipe.difficulty || 'Not set'}</span>
+                  <span>Cuisine: {recipe.cuisine || 'Mixed'}</span>
+                  <span>Match: {recipe.matchScore ?? recipe.match ?? 0}%</span>
                 </div>
                 {recipe.uses ? (
                   <p className="text-xs mb-4 line-clamp-1" style={{ color: onCardMuted }}>
@@ -440,13 +485,18 @@ export function AIMeals() {
                   style={{ background: c.teal, boxShadow: `0 0 20px ${c.teal}55` }}
                 >
                   <RefreshCw className={`w-4 h-4 ${planLoading ? 'animate-spin' : ''}`} />
-                  {planLoading ? 'Generating…' : 'Generate New Plan'}
+                  {planLoading ? 'Generating your personalized meal plan...' : 'Generate New Plan'}
                 </motion.button>
               </div>
             </div>
 
             {planError && (
-              <div className="text-center py-4 mb-4 text-sm" style={{ color: '#ef4444' }}>{planError}</div>
+              <div className="text-center py-4 mb-4 text-sm" style={{ color: '#ef4444' }}>
+                {planError}
+                <button onClick={handleGeneratePlan} disabled={planLoading} className="ml-3 underline disabled:opacity-70" style={{ color: c.teal }}>
+                  Retry
+                </button>
+              </div>
             )}
 
             {!plan && !planLoading && (
@@ -457,36 +507,34 @@ export function AIMeals() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {(plan?.weekPlan || []).map((day, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * i }}
-                  className="rounded-2xl p-5"
-                  style={{ background: c.cardBg, border: `1px solid ${c.borderLight}`, boxShadow: c.cardShadow }}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold" style={{ color: onCardPrimary }}>{day.day || `Day ${i + 1}`}</h3>
-                    {plan.condition && plan.condition !== 'none' && (
-                      <span className="px-2 py-0.5 rounded-full text-xs capitalize" style={{ background: c.tagBg, color: c.teal }}>
-                        {plan.condition.replace(/_/g, ' ')}
-                      </span>
-                    )}
-                  </div>
-                  {['breakfast', 'lunch', 'dinner'].map(meal => {
-                    const m = day[meal];
-                    if (!m) return null;
-                    return (
-                      <div key={meal} className="mb-3 pb-3" style={{ borderBottom: `1px solid ${c.border}` }}>
-                        <div className="text-xs uppercase tracking-wide mb-1" style={{ color: c.teal }}>{meal}</div>
-                        <div className="text-sm font-medium" style={{ color: onCardPrimary }}>{m.name}</div>
-                        <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: onCardSecondary }}>
-                          <Flame className="w-3 h-3" /> {m.calories || 0} kcal
-                        </div>
-                      </div>
-                    );
-                  })}
-                </motion.div>
-              ))}
+              {Array.from({ length: 7 }).map((_, dayIndex) => {
+                const day = (plan?.weekPlan || [])[dayIndex] || {};
+                return (
+<motion.div
+                     key={day.day || dayIndex}
+                     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * dayIndex }}
+                     className="rounded-2xl p-5 transition-all duration-200"
+                     style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: c.cardShadow }}
+                     whileHover={{ 
+                       boxShadow: c.cardHoverShadow,
+                       transform: 'translateY(-2px)',
+                     }}
+                   >
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-bold" style={{ color: onCardPrimary }}>{day.day || `Day ${dayIndex + 1}`}</h3>
+                      {plan.condition && plan.condition !== 'none' && (
+                        <span className="px-2 py-0.5 rounded-full text-xs capitalize" style={{ background: c.tagBg, color: c.teal }}>
+                          {plan.condition.replace(/_/g, ' ')}
+                        </span>
+                      )}
+                    </div>
+                    {renderPlanMeal('breakfast', day.breakfast)}
+                    {renderPlanMeal('lunch', day.lunch)}
+                    {renderPlanMeal('dinner', day.dinner)}
+                    {renderPlanMeal('snack', day.snack)}
+                  </motion.div>
+                );
+              })}
             </div>
           </motion.div>
         )}

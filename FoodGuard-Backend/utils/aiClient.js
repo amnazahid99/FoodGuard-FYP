@@ -15,7 +15,7 @@ function sleep(ms) {
 // User-facing message when the AI service is unreachable or failing. We never
 // surface raw stack traces or fake/mock data to the client — just a clean 503.
 const AI_UNAVAILABLE_MESSAGE =
-  'The AI service is temporarily unavailable. Please try again in a moment.';
+  'AI service is temporarily unavailable. Please try again';
 
 /**
  * POST to the FastAPI AI service with retry + backoff and a hard timeout.
@@ -28,6 +28,7 @@ async function aiPost(path, body, opts = {}) {
   const timeout = Number(opts.timeout ?? 15000);
   let attempt = 0;
   let lastDetail = '';
+  let status;
 
   while (attempt <= maxRetries) {
     try {
@@ -47,7 +48,6 @@ async function aiPost(path, body, opts = {}) {
       const isNetworkErr = ['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNABORTED'].includes(err.code);
       const isServerError = status >= 500;
 
-      // Retry network errors and 5xx with linear backoff.
       if ((isNetworkErr || isServerError) && attempt <= maxRetries) {
         const backoff = 500 * attempt;
         console.warn(`[aiClient] ${path} error (${err.code || status}). Retrying ${attempt}/${maxRetries} after ${backoff}ms...`);
@@ -55,7 +55,6 @@ async function aiPost(path, body, opts = {}) {
         continue;
       }
 
-      // Rate limit — back off harder, then retry.
       if (status === 429 && attempt <= maxRetries) {
         const backoff = 2000 * attempt;
         console.warn(`[aiClient] ${path} rate limited. Retrying ${attempt}/${maxRetries} after ${backoff}ms...`);
@@ -63,12 +62,21 @@ async function aiPost(path, body, opts = {}) {
         continue;
       }
 
-      break; // out of retries (or non-retryable) — fall through to a clean 503
+      break;
     }
   }
 
+  if (status && status < 500 && status !== 429) {
+    const e = new Error(lastDetail || `AI service request failed with status ${status}`);
+    e.statusCode = status;
+    throw e;
+  }
+
   console.error('[aiClient] AI service unavailable:', { path, detail: lastDetail });
-  const e = new Error(AI_UNAVAILABLE_MESSAGE);
+  const friendly = path.includes('/scan-receipt')
+    ? 'Receipt could not be processed. Please upload a clearer image.'
+    : AI_UNAVAILABLE_MESSAGE;
+  const e = new Error(friendly);
   e.statusCode = 503;
   e.detail = lastDetail;
   throw e;

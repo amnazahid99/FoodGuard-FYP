@@ -24,14 +24,15 @@ class HealthCondition(str, Enum):
 
 # ==================== Meal Recommendation ====================
 class MealRecommendRequest(BaseModel):
-    ingredients: List[str] = Field(..., min_length=1, description="List of available ingredients")
-    # Free-form strings (not strict enums) so saved user preferences like
-    # "omnivore" / "pescatarian" / a cuisine name pass through instead of 422-ing.
-    dietary_preference: Optional[str] = None
-    health_condition: Optional[str] = None
-    cuisine_preference: Optional[str] = None
+    ingredients: List[str] = Field(default_factory=list)
+    inventory_items: Optional[List[Dict[str, Any]]] = None
     expiring_items: Optional[List[str]] = None
-
+    expiring_warn_days: Optional[int] = 3
+    health_condition: Optional[str] = None
+    dietary_preference: Optional[str] = None
+    cuisine_preference: Optional[str] = None
+    health_profile: Optional[Dict[str, Any]] = None
+    units: Optional[str] = "metric"
     @field_validator("dietary_preference", "health_condition", "cuisine_preference", mode="before")
     @classmethod
     def _blank_none_to_null(cls, value):
@@ -53,8 +54,13 @@ class MealSuggestion(BaseModel):
     image: Optional[str] = None
     uses_expiring: bool = False
     health_note: Optional[str] = None
-    used_ingredients: List[str] = []
-    missed_ingredients: List[str] = []
+    used_ingredients: List[str] = Field(default_factory=list)
+    missed_ingredients: List[str] = Field(default_factory=list)
+    difficulty: Optional[str] = None
+    cuisine: Optional[str] = None
+    match_score: Optional[float] = None
+    ingredients: List[str] = Field(default_factory=list)
+    instructions: List[str] = Field(default_factory=list)
 
 
 class MealRecommendResponse(BaseModel):
@@ -253,8 +259,14 @@ class NutritionAnalyzeResponse(BaseModel):
 # ==================== Condition-Based Meal Plan ====================
 class ConditionMealPlanRequest(BaseModel):
     condition: str
-    available_ingredients: List[str] = []
+    available_ingredients: List[str] = Field(default_factory=list)
+    inventory_items: List[Dict[str, Any]] = Field(default_factory=list)
+    dietary_preference: Optional[str] = None
+    cuisine_preference: Optional[str] = None
+    units: Optional[str] = "metric"
+    health_profile: Dict[str, Any] = Field(default_factory=dict)
     days: int = Field(default=7, ge=1, le=7)
+    expiring_warn_days: Optional[int] = 3
 
 
 class ConditionMealPlanResponse(BaseModel):

@@ -3,12 +3,20 @@ const Alert = require('../models/Alert');
 const Item = require('../models/InventoryItem');
 
 const DAY = 86400000;
+const ACTIVE_STATUSES = { $nin: ['consumed', 'wasted'] };
 
-// FEATURE 5 — smart expiry alerts.
-// Always computed fresh from inventory dates; enriched with AI tips and
-// dismissed-flags persisted by the daily cron job (see utils/scheduler.js).
+async function cleanupOrphanAlerts(userId) {
+  const activeItemIds = await Item.find({ user: userId }).distinct('_id');
+  if (activeItemIds.length) {
+    await Alert.deleteMany({ user: userId, item: { $nin: activeItemIds } });
+  } else {
+    await Alert.deleteMany({ user: userId, item: { $ne: null } });
+  }
+}
+
 exports.list = asyncHandler(async (req, res) => {
-  const items = await Item.find({ user: req.user._id, status: { $nin: ['consumed', 'wasted'] } });
+  const items = await Item.find({ user: req.user._id, status: ACTIVE_STATUSES });
+  await cleanupOrphanAlerts(req.user._id);
   const now = Date.now();
 
   const stored = await Alert.find({ user: req.user._id });
@@ -38,9 +46,11 @@ exports.list = asyncHandler(async (req, res) => {
 });
 
 exports.dismiss = asyncHandler(async (req, res) => {
+  const item = await Item.findOne({ _id: req.params.id, user: req.user._id, status: ACTIVE_STATUSES });
+  if (!item) { res.status(404); throw new Error('Item not found'); }
   await Alert.findOneAndUpdate(
-    { user: req.user._id, item: req.params.id },
-    { user: req.user._id, item: req.params.id, dismissed: true },
+    { user: req.user._id, item: item._id },
+    { user: req.user._id, item: item._id, dismissed: true },
     { upsert: true }
   );
   res.json({ message: 'Dismissed' });

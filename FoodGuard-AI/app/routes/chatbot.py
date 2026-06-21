@@ -80,10 +80,10 @@ async def chat_with_foodguard(request: ChatbotRequest):
                     detail=f"AI service error: {gemini_result.get('error')}"
                 )
 
-            response_text = gemini_result.get("text", "I apologize, but I couldn't generate a response at this time.")
+            response_text = gemini_result.get("text") or gemini_result.get("content", "I apologize, but I couldn't generate a response at this time.")
             used_fallback = True
         else:
-            response_text = result.get("text", "I apologize, but I couldn't generate a response at this time.")
+            response_text = result.get("text") or result.get("content", "I apologize, but I couldn't generate a response at this time.")
             used_fallback = False
 
         # Generate contextual suggestions

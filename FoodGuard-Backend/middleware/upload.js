@@ -9,13 +9,11 @@ const storage = multer.diskStorage({
   },
 });
 
-// Only accept image uploads (receipt scans / avatars). Reject everything else
-// with a clean 400 instead of forwarding a non-image to the OCR service.
 function imageOnly(_req, file, cb) {
-  if (/^image\/(jpe?g|png|webp|heic|heif|gif|bmp)$/i.test(file.mimetype)) {
+  if (/^image\/(jpe?g|png|webp)$/i.test(file.mimetype)) {
     return cb(null, true);
   }
-  const err = new Error('Only image files are allowed (jpg, png, webp, heic).');
+  const err = new Error('Only jpg, jpeg, png, and webp images are allowed.');
   err.statusCode = 400;
   cb(err, false);
 }

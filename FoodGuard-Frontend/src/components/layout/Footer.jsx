@@ -4,9 +4,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 
 export function Footer() {
   const { c } = useTheme();
-  // Footer surface stays DARK in both themes — keep text light always
-  const footText       = '#A8B2C1';
-  const footTextStrong = '#FFFFFF';
+  const footText       = c.footerText || '#A8B2C1';
+  const footTextStrong = c.footerTextStrong || '#FFFFFF';
 
   return (
     <footer

@@ -804,32 +804,32 @@ export function Landing() {
             Customer Testimonials
           </motion.h2>
 
-          <Slider {...sliderSettings}>
-            {testimonials.map((testimonial, index) => (
-              <div key={index} className="px-4">
-                <div className="bg-[#112240]/50 backdrop-blur-md rounded-2xl p-8 border-l-4 border-[#1ABC9C] border-r border-t border-b border-white/10 h-64 flex flex-col justify-between">
-                  <div>
-                    <div className="flex gap-1 mb-4">
-                      {[...Array(testimonial.rating)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className="w-5 h-5 fill-[#1ABC9C] text-[#1ABC9C]"
-                        />
-                      ))}
-                    </div>
-                    <p className="text-gray-300 italic mb-6">
-                      "{testimonial.quote}"
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-white font-semibold">
-                      {testimonial.name}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </Slider>
+           <Slider {...sliderSettings}>
+             {testimonials.map((testimonial, index) => (
+               <div key={index} className="px-4">
+                 <div className="backdrop-blur-md rounded-2xl p-8 border-l-4 border-[#1ABC9C] border-r border-t border-b flex flex-col justify-between" style={{ background: c.cardBg, borderColor: c.border }}>
+                   <div>
+                     <div className="flex gap-1 mb-4">
+                       {[...Array(testimonial.rating)].map((_, i) => (
+                         <Star
+                           key={i}
+                           className="w-5 h-5 fill-[#1ABC9C] text-[#1ABC9C]"
+                         />
+                       ))}
+                     </div>
+                     <p className="text-sm italic mb-6" style={{ color: c.textSecondary }}>
+                       "{testimonial.quote}"
+                     </p>
+                   </div>
+                   <div>
+                     <p className="font-semibold" style={{ color: c.textPrimary }}>
+                       {testimonial.name}
+                     </p>
+                   </div>
+                 </div>
+               </div>
+             ))}
+           </Slider>
         </div>
       </section>
 
@@ -846,7 +846,7 @@ export function Landing() {
             Frequently Asked Questions
           </motion.h2>
 
-          <Accordion type="single" collapsible className="space-y-4">
+           <Accordion type="single" collapsible className="space-y-4">
             {faqs.map((faq, index) => (
               <AccordionItem
                 key={index}
@@ -858,10 +858,10 @@ export function Landing() {
                   boxShadow: c.cardShadow,
                 }}
               >
-                <AccordionTrigger className="text-white hover:text-[#1ABC9C] text-left">
+                <AccordionTrigger className="text-left hover:text-[#1ABC9C]" style={{ color: c.textPrimary }}>
                   {faq.question}
                 </AccordionTrigger>
-                <AccordionContent className="text-gray-400">
+                <AccordionContent style={{ color: c.textSecondary }}>
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>
@@ -932,40 +932,40 @@ export function Landing() {
               viewport={{ once: true }}
               transition={{ delay: 0.1 }}
             >
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                Most Popular
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Pro</h3>
-              <div className="mb-6">
-                <span className="text-5xl font-bold text-white">₨499</span>
-                <span className="text-white/80">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-2 text-white">
-                  <ChevronRight className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                  <span>Unlimited items</span>
-                </li>
-                <li className="flex items-start gap-2 text-white">
-                  <ChevronRight className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                  <span>Smart alerts & notifications</span>
-                </li>
-                <li className="flex items-start gap-2 text-white">
-                  <ChevronRight className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                  <span>Unlimited AI recipes</span>
-                </li>
-                <li className="flex items-start gap-2 text-white">
-                  <ChevronRight className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                  <span>Barcode & receipt scanning</span>
-                </li>
-                <li className="flex items-start gap-2 text-white">
-                  <ChevronRight className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                  <span>Nutrition tracking</span>
-                </li>
-              </ul>
-              <Button variant="white" className="w-full" onClick={() => onSelectPlan('pro')} disabled={busy === 'pro'}>
-                {busy === 'pro' ? 'Redirecting…' : 'Start Free Trial'}
-              </Button>
-            </motion.div>
+               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                 Most Popular
+               </div>
+               <h3 className="text-2xl font-bold text-white mb-2" style={{ color: c.textPrimary }}>Pro</h3>
+               <div className="mb-6">
+                 <span className="text-5xl font-bold text-white" style={{ color: c.textPrimary }}>₨499</span>
+                 <span className="text-sm" style={{ color: c.textSecondary }}> /month</span>
+               </div>
+               <ul className="space-y-3 mb-8">
+                 <li className="flex items-start gap-2" style={{ color: c.textSecondary }}>
+                   <ChevronRight className="w-5 h-5 text-[#1ABC9C] flex-shrink-0 mt-0.5" />
+                   <span>Unlimited items</span>
+                 </li>
+                 <li className="flex items-start gap-2" style={{ color: c.textSecondary }}>
+                   <ChevronRight className="w-5 h-5 text-[#1ABC9C] flex-shrink-0 mt-0.5" />
+                   <span>Smart alerts & notifications</span>
+                 </li>
+                 <li className="flex items-start gap-2" style={{ color: c.textSecondary }}>
+                   <ChevronRight className="w-5 h-5 text-[#1ABC9C] flex-shrink-0 mt-0.5" />
+                   <span>Unlimited AI recipes</span>
+                 </li>
+                 <li className="flex items-start gap-2" style={{ color: c.textSecondary }}>
+                   <ChevronRight className="w-5 h-5 text-[#1ABC9C] flex-shrink-0 mt-0.5" />
+                   <span>Barcode & receipt scanning</span>
+                 </li>
+                 <li className="flex items-start gap-2" style={{ color: c.textSecondary }}>
+                   <ChevronRight className="w-5 h-5 text-[#1ABC9C] flex-shrink-0 mt-0.5" />
+                   <span>Nutrition tracking</span>
+                 </li>
+               </ul>
+               <Button variant="white" className="w-full" onClick={() => onSelectPlan('pro')} disabled={busy === 'pro'} style={{ background: c.teal, color: '#fff' }}>
+                 {busy === 'pro' ? 'Redirecting…' : 'Start Free Trial'}
+               </Button>
+             </motion.div>
 
             {/* Family Plan */}
             <motion.div

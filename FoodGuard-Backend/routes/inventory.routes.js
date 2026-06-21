@@ -10,6 +10,7 @@ router.post('/', enforceItemLimit, c.create);
 router.post('/bulk', enforceItemLimit, c.bulkCreate);
 router.post('/scan-receipt', upload.single('image'), c.scanReceipt); // FEATURE 1
 router.get('/wastage-report', c.wastageReport);                       // FEATURE 7
+router.patch('/:id/consume', c.consume);
 router.put('/:id', c.update);
 router.delete('/:id', c.remove);
 
