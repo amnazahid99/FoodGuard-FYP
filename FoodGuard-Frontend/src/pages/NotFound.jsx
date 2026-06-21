@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
-import { Home } from 'lucide-react';
+import { Home as HomeIcon } from 'lucide-react';
 
 export function NotFound() {
   const navigate = useNavigate();
@@ -25,7 +25,7 @@ export function NotFound() {
             onClick={() => navigate('/')}
             className="bg-[#1ABC9C] hover:bg-[#16a085] text-white rounded-full px-8 py-6 text-lg"
           >
-            <Home className="w-5 h-5 mr-2" />
+            <HomeIcon className="w-5 h-5 mr-2" />
             Back to Home
           </Button>
         </motion.div>

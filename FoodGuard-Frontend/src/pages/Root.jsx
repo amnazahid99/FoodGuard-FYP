@@ -1,7 +1,7 @@
 import { Outlet } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
-import { Footer } from '../components/Footer';
-import { CosmicBackground } from '../components/CosmicBackground';
+import { Navbar } from '../components/layout/Navbar';
+import { Footer } from '../components/layout/Footer';
+import { CosmicBackground } from '../components/layout/CosmicBackground';
 import { useTheme } from '../contexts/ThemeContext';
 
 export function Root() {

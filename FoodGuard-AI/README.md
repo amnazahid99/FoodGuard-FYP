@@ -20,7 +20,6 @@
 - [⚙️ Environment Setup](#️-environment-setup)
 - [🚀 Running the Service](#-running-the-service)
 - [🔗 API Endpoints](#-api-endpoints)
-- [💡 Request/Response Examples](#-requestresponse-examples)
 - [🔧 Troubleshooting](#-troubleshooting)
 - [📄 License](#-license)
 
@@ -30,8 +29,9 @@
 
 FoodGuard-AI is a **FastAPI-based microservice** that powers all the intelligent features of the FoodGuard system. It acts as an abstraction layer over external AI APIs, providing a unified interface for:
 
-- **Natural Language Processing** via Groq (Llama, Mixtral models)
-- **Computer Vision** via Google Gemini
+- **Natural Language Processing** via Groq (Llama-3.3-70b) — used for meal recommendations, nutrition analysis, meal planning, and chatbot
+- **Computer Vision** via Fireworks AI (kimi-k2p5) — primary OCR provider for receipt scanning
+- **Google Gemini** — fallback OCR and optional text AI
 - **External Food APIs** (Spoonacular, CalorieNinjas) as fallbacks
 
 The service is **stateless** — it doesn't connect to MongoDB; it only processes requests from the Express backend and returns AI-generated responses.
@@ -45,20 +45,21 @@ The service is **stateless** — it doesn't connect to MongoDB; it only processe
 │                     Express.js Backend                          │
 │                      :5001                                       │
 └─────────────────────────────┬───────────────────────────────────┘
-                              │ HTTP / REST
+                            │ HTTP / REST
 ┌─────────────────────────────▼───────────────────────────────────┐
-│                   FoodGuard-AI Service (Python)                  │
-│                      :8000                                        │
+│                   FoodGuard-AI Service (Python)                   │
+│                      :8000                                       │
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │                    FastAPI App                               ││
 │  ├─────────────────────────────────────────────────────────────┤│
 │  │  Routes (OCR, Meals, Nutrition, Health, etc.)             ││
 │  ├─────────────────────────────────────────────────────────────┤│
 │  │  Services Layer                                             ││
-│  │  ├── groq_service.py     → Llama-3.3-70b-versatile         ││
-│  │  ├── gemini_service.py  → Gemini Vision (OCR)               ││
-│  │  ├── prompt_engine.py  → AI prompt templates              ││
-│  │  └── external_apis.py   → Spoonacular, CalorieNinjas       ││
+│  │  ├── groq_service.py → Llama-3.3-70b (LLM + OCR fallback)    ││
+│  │  ├── fireworks_service.py → Fireworks vision (primary OCR)    ││
+│  │  ├── gemini_service.py → Gemini vision (OCR fallback)         ││
+│  │  ├── prompt_engine.py → AI prompt templates                   ││
+│  │  └── external_apis.py → Spoonacular, CalorieNinjas           ││
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -71,8 +72,9 @@ The service is **stateless** — it doesn't connect to MongoDB; it only processe
 | **FastAPI** | Web Framework |
 | **Uvicorn** | ASGI Server |
 | **Pydantic** | Data Validation |
-| **Groq** | LLM (Llama-3.3-70b-versatile) |
-| **Google Gemini** | Vision & Text AI |
+| **Groq** | LLM (Llama-3.3-70b) |
+| **Fireworks AI** | Primary OCR (kimi-k2p5) |
+| **Google Gemini** | OCR fallback |
 | **httpx** | Async HTTP Client |
 
 ---
@@ -81,7 +83,7 @@ The service is **stateless** — it doesn't connect to MongoDB; it only processe
 
 | Feature | Endpoint | Description |
 |---------|----------|-------------|
-| **F1: Receipt Scanning (OCR)** | `POST /ai/scan-receipt` | Extract item details from receipt images using Gemini Vision |
+| **F1: Receipt Scanning (OCR)** | `POST /ai/scan-receipt` | Extract item details from receipt images using Fireworks AI (primary) with Groq fallback |
 | **F2: Meal Recommendations** | `POST /ai/recommend-meals` | AI-powered meal suggestions based on available inventory |
 | **F3: Nutrition Analysis** | `POST /ai/analyze-nutrition` | Detailed nutritional breakdown of meals/ingredients |
 | **F4: Condition-Based Meal Plans** | `POST /ai/condition-meal-plan` | Generate meal plans for dietary conditions (diabetes, weight loss, etc.) |
@@ -89,7 +91,7 @@ The service is **stateless** — it doesn't connect to MongoDB; it only processe
 | **F6: Health Profile (BMI)** | `POST /ai/health-profile` | Calculate BMI and provide diet recommendations |
 | **F7: Wastage Reporting** | `POST /ai/wastage-report` | Analyze and report food wastage patterns |
 | **Dashboard Summary** | `POST /ai/dashboard-summary` | AI-generated insights for the dashboard |
-| **AI Chatbot** | `POST /ai/chatbot` | Interactive chatbot for food-related queries |
+| **AI Chatbot** | `POST /ai/chatbot` | Interactive chatbot for food-related queries using Groq LLM |
 
 ### Feature Mapping
 
@@ -180,7 +182,7 @@ APP_PORT=8000
 LOG_LEVEL=INFO
 ```
 
-> ⚠️ **Note:** The service will NOT start without `GROQ_API_KEY` and `GEMINI_API_KEY` — these are validated by Pydantic at boot.
+> ⚠️ **Note:** The service starts without API keys, but AI features return 503 until they are configured.
 
 ---
 

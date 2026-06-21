@@ -93,10 +93,10 @@ export const lightColors = {
   mobileMenuBorder:'rgba(165,140,110,0.25)',
 
   // Footer
-  footerBg:        '#1B4D3E',
-  footerBorder:    'rgba(255,255,255,0.08)',
-  footerText:      '#A8B2C1',
-  footerTextStrong:'#FFFFFF',
+  footerBg:        '#F3EFE8',
+  footerBorder:    'rgba(165,140,110,0.25)',
+  footerText:      '#475467',
+  footerTextStrong:'#1B4D3E',
 
   // Orbs - warm ambiance
   orbColor1:       'rgba(255,213,134,0.15)',

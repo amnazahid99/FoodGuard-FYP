@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, Share2, Printer, Clock, Flame, Users, BarChart3,
   Star, Sparkles, ChevronRight, ShoppingCart, MessageSquare,
-  Bookmark, BookmarkCheck, AlertTriangle,
+  Bookmark, BookmarkCheck, AlertTriangle, X as XIcon, Send, RefreshCw,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import mealsService from '../services/meals.service';
@@ -174,6 +174,13 @@ export function RecipeDetail() {
   const [servings, setServings]         = useState(4);
   const [checked, setChecked]           = useState({});
   const [saved, setSaved]               = useState(false);
+  const [compareOpen, setCompareOpen]   = useState(false);
+  const [healthierRecipe, setHealthierRecipe] = useState(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [chatOpen, setChatOpen]         = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput]       = useState('');
+  const [chatLoading, setChatLoading]   = useState(false);
   const { c, isDark } = useTheme();
 
   const onCardPrimary   = isDark ? c.textPrimary   : c.textOnCardPrimary;
@@ -193,6 +200,69 @@ export function RecipeDetail() {
 
   const toggleCheck = (key) =>
     setChecked(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // Handle opening compare modal and fetching healthier version
+  const handleCompareClick = async () => {
+    setCompareOpen(true);
+    setCompareLoading(true);
+    setHealthierRecipe(null);
+    try {
+      const result = await mealsService.recommend({
+        query: recipe?.name || '',
+        health_condition: 'none',
+        dietary_preference: 'none',
+      });
+      const list = Array.isArray(result) ? result : (result?.recipes || []);
+      if (list && list.length > 0) {
+        setHealthierRecipe(list[0]);
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      setCompareLoading(false);
+    }
+  };
+
+  const closeCompare = () => setCompareOpen(false);
+
+  // Chat handlers
+  const openChat = () => {
+    setChatOpen(true);
+    if (chatMessages.length === 0) {
+      setChatMessages([{ role: 'assistant', content: 'Hi! I\'m your FoodGuard AI Chef. Ask me anything about this recipe, nutrition tips, or cooking advice!' }]);
+    }
+  };
+
+  const closeChat = () => setChatOpen(false);
+
+  const handleChatSend = async () => {
+    if (!chatInput.trim() || chatLoading) return;
+    const userMsg = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setChatLoading(true);
+    try {
+      const result = await mealsService.chatWithChef({
+        message: userMsg,
+        history: chatMessages,
+        recipeContext: recipe?.reasoning || recipe?.healthNote || '',
+        recipeName: recipe?.name || ''
+      });
+      const reply = result?.chef_response || result?.response || 'Sorry, I could not process your request.';
+      setChatMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+    } catch (e) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, the AI Chef is temporarily unavailable. Please try again later.' }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const handleChatKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleChatSend();
+    }
+  };
 
   // Fetch recipe from backend and map to UI shape; fallback to static demo
   useEffect(() => {
@@ -574,13 +644,14 @@ export function RecipeDetail() {
                   </span>
                 ))}
               </div>
-              <button
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
-                style={{ border: `1px solid ${c.teal}`, color: c.teal, background: 'transparent' }}
-              >
-                <MessageSquare className="w-4 h-4" />
-                💬 Ask AI Chef About This Recipe
-              </button>
+<button
+                 onClick={openChat}
+                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
+                 style={{ border: `1px solid ${c.teal}`, color: c.teal, background: 'transparent' }}
+               >
+                 <MessageSquare className="w-4 h-4" />
+                 💬 Ask AI Chef About This Recipe
+               </button>
             </motion.section>
           </div>
 
@@ -743,6 +814,7 @@ export function RecipeDetail() {
 
                 {/* Compare button */}
                 <button
+                  onClick={handleCompareClick}
                   className="w-full py-2.5 rounded-xl text-sm font-semibold mb-3 transition-all hover:scale-[1.02]"
                   style={{ border: `1px solid ${c.teal}`, color: c.teal, background: 'transparent' }}
                 >
@@ -767,11 +839,146 @@ export function RecipeDetail() {
                     📤 Share
                   </button>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+</div>
+               </div>
+             </div>
+           </div>
+         </div>
+
+         {/* Compare Modal */}
+         <AnimatePresence>
+           {compareOpen && (
+             <motion.div
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               exit={{ opacity: 0 }}
+               className="fixed inset-0 z-50 flex items-center justify-center p-4"
+               style={{ background: 'rgba(0,0,0,0.6)' }}
+               onClick={closeCompare}
+             >
+               <motion.div
+                 initial={{ scale: 0.9, opacity: 0 }}
+                 animate={{ scale: 1, opacity: 1 }}
+                 exit={{ scale: 0.9, opacity: 0 }}
+                 className="rounded-2xl p-6 max-w-lg w-full"
+                 style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: c.elevatedShadow }}
+                 onClick={e => e.stopPropagation()}
+               >
+                 <div className="flex items-center justify-between mb-4">
+                   <h3 className="font-bold" style={{ color: onCardPrimary }}>Healthier Alternative</h3>
+                   <button onClick={closeCompare} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/10">
+                     <XIcon className="w-4 h-4" style={{ color: onCardSecondary }} />
+                   </button>
+                 </div>
+                 {compareLoading ? (
+                   <div className="text-center py-8" style={{ color: onCardSecondary }}>Loading healthier version...</div>
+                 ) : healthierRecipe ? (
+                   <div>
+                     <p className="text-sm mb-2" style={{ color: onCardPrimary }}><strong>{healthierRecipe.name}</strong></p>
+                     <p className="text-xs mb-3" style={{ color: onCardSecondary }}>{healthierRecipe.description || healthierRecipe.healthNote}</p>
+                     <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: onCardMuted }}>
+                       <span>Calories: {healthierRecipe.calories || 0} kcal</span>
+                       <span>Protein: {Math.round(healthierRecipe.protein || 0)}g</span>
+                       <span>Carbs: {Math.round(healthierRecipe.carbs || 0)}g</span>
+                       <span>Fat: {Math.round(healthierRecipe.fats || 0)}g</span>
+                     </div>
+                   </div>
+                 ) : (
+                   <p className="text-sm" style={{ color: onCardSecondary }}>No alternative found. Try generating new recommendations.</p>
+                 )}
+               </motion.div>
+             </motion.div>
+           )}
+         </AnimatePresence>
+
+         {/* Chat Modal */}
+         <AnimatePresence>
+           {chatOpen && (
+             <motion.div
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               exit={{ opacity: 0 }}
+               className="fixed inset-0 z-50 flex items-end justify-end p-4"
+               style={{ background: 'rgba(0,0,0,0.3)' }}
+               onClick={closeChat}
+             >
+               <motion.div
+                 initial={{ x: 300, y: 100, opacity: 0 }}
+                 animate={{ x: 0, y: 0, opacity: 1 }}
+                 exit={{ x: 300, y: 100, opacity: 0 }}
+                 className="rounded-2xl flex flex-col w-80 sm:w-96"
+                 style={{ 
+                   background: c.cardBg, 
+                   border: `1px solid ${c.border}`, 
+                   boxShadow: c.elevatedShadow,
+                   maxHeight: '450px'
+                 }}
+                 onClick={e => e.stopPropagation()}
+               >
+                 {/* Header */}
+                 <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: c.border }}>
+                   <div className="flex items-center gap-2">
+                     <MessageSquare className="w-5 h-5" style={{ color: c.teal }} />
+                     <span className="font-bold" style={{ color: onCardPrimary }}>AI Chef Chat</span>
+                   </div>
+                   <button onClick={closeChat} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/10">
+                     <XIcon className="w-4 h-4" style={{ color: onCardSecondary }} />
+                   </button>
+                 </div>
+
+                 {/* Messages */}
+                 <div className="flex-1 p-4 overflow-y-auto" style={{ maxHeight: '320px' }}>
+                   {chatMessages.map((msg, i) => (
+                     <div key={i} className={`mb-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                       <div
+                         className="max-w-[80%] rounded-xl px-3 py-2 text-sm"
+                         style={{
+                           background: msg.role === 'user' ? c.teal : c.tagBg,
+                           color: msg.role === 'user' ? '#fff' : onCardPrimary,
+                         }}
+                       >
+                         {msg.content}
+                       </div>
+                     </div>
+                   ))}
+                   {chatLoading && (
+                     <div className="mb-3 flex justify-start">
+                       <div className="rounded-xl px-3 py-2 text-sm" style={{ background: c.tagBg, color: onCardSecondary }}>
+                         Thinking...
+                       </div>
+                     </div>
+                   )}
+                 </div>
+
+                 {/* Input */}
+                 <div className="p-3 border-t flex gap-2" style={{ borderColor: c.border }}>
+                   <input
+                     type="text"
+                     value={chatInput}
+                     onChange={e => setChatInput(e.target.value)}
+                     onKeyPress={handleChatKeyPress}
+                     placeholder="Ask about this recipe..."
+                     className="flex-1 rounded-lg text-sm outline-none"
+                     style={{
+                       background: c.inputBg,
+                       border: `1px solid ${c.inputBorder}`,
+                       color: c.inputText || '#fff',
+                       padding: '8px 12px',
+                     }}
+                   />
+                   <button
+                     onClick={handleChatSend}
+                     disabled={!chatInput.trim() || chatLoading}
+                     className="w-9 h-9 rounded-lg flex items-center justify-center disabled:opacity-50"
+                     style={{ background: c.teal }}
+                   >
+                     <Send className="w-4 h-4 text-white" />
+                   </button>
+                 </div>
+               </motion.div>
+             </motion.div>
+           )}
+         </AnimatePresence>
 
     </div>
   );

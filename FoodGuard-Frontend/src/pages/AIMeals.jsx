@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, Clock, Flame, ChefHat, Upload, Leaf, CalendarDays, RefreshCw } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Sparkles, Clock, Flame, ChefHat, Upload, Leaf, CalendarDays, RefreshCw, MessageSquare, Send, X as XIcon } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useInventory } from '../contexts/InventoryContext';
@@ -33,6 +33,12 @@ export function AIMeals() {
   const [planCondition, setPlanCondition] = useState('none');
   const [planLoading, setPlanLoading]   = useState(false);
   const [planError, setPlanError]       = useState(null);
+
+  // Chatbot state
+  const [chatOpen, setChatOpen]         = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput]     = useState('');
+  const [chatLoading, setChatLoading]   = useState(false);
 
   const recipesRef = useRef(null);
   const { c, isDark } = useTheme();
@@ -75,8 +81,8 @@ export function AIMeals() {
   // Auto-load recommendations on first visit
   useEffect(() => { fetchRecommendations(); /* eslint-disable-next-line */ }, []);
 
-  // Load the saved meal plan when opening that tab
-  useEffect(() => {
+// Load the saved meal plan when opening that tab
+   useEffect(() => {
     if (tab !== 'plan') return;
     setPlanLoading(true);
     setPlanError(null);
@@ -84,10 +90,12 @@ export function AIMeals() {
       try {
         const p = await mealsService.getMealPlan();
         if (p) { setPlan(p); setPlanCondition(p.condition || 'none'); }
-      } catch (_) { setPlan(null); }
+      } catch (e) {
+        setPlan(null);
+        setPlanError(e?.message || 'Could not load meal plan');
+      }
     })();
-    return () => {};
-    /* eslint-disable-next-line */
+     /* eslint-disable-next-line */
   }, [tab]);
 
   const handleGetRecommendations = async () => {
@@ -105,6 +113,40 @@ export function AIMeals() {
       setPlanError(message.includes('AI service') ? AI_UNAVAILABLE_MESSAGE : (message || 'Could not generate meal plan.'));
     } finally {
       setPlanLoading(false);
+    }
+  };
+
+  // Chatbot handlers
+  const openChat = () => {
+    setChatOpen(true);
+    if (chatMessages.length === 0) {
+      setChatMessages([{ role: 'assistant', content: 'Hi! I\'m your FoodGuard AI Chef. Ask me anything about recipes, nutrition, or cooking tips!' }]);
+    }
+  };
+
+  const closeChat = () => setChatOpen(false);
+
+  const handleChatSend = async () => {
+    if (!chatInput.trim() || chatLoading) return;
+    const userMsg = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setChatLoading(true);
+    try {
+      const result = await mealsService.chatWithChef({ message: userMsg, history: chatMessages });
+      const reply = result?.chef_response || result?.response || 'Sorry, I could not process your request.';
+      setChatMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+    } catch (e) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, the AI Chef is temporarily unavailable. Please try again later.' }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const handleChatKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleChatSend();
     }
   };
 
@@ -149,7 +191,7 @@ export function AIMeals() {
           <p className="text-xs mt-2" style={{ color: onCardMuted }}>Ingredients: {(meal.ingredients || []).slice(0, 5).join(', ')}</p>
         ) : null}
         {instructions.length ? (
-          <p className="text-xs mt-1" style={{ color: onCardMuted }}>Instructions: {instructions.slice(0, 2).join(' ')}</p>
+          <p className="text-xs mt-1" style={{ color: onCardMuted }}>Instructions: {instructions.join('. ')}</p>
         ) : null}
       </div>
     );
@@ -499,10 +541,17 @@ export function AIMeals() {
               </div>
             )}
 
-            {!plan && !planLoading && (
+            {!plan && !planLoading && !planError && (
               <div className="text-center py-12" style={{ color: onCardSecondary }}>
                 <CalendarDays className="w-10 h-10 mx-auto mb-3" style={{ color: c.teal, opacity: 0.7 }} />
                 <p className="text-sm">No meal plan yet. Pick a condition and click "Generate New Plan".</p>
+              </div>
+            )}
+
+            {planLoading && (
+              <div className="text-center py-12" style={{ color: onCardSecondary }}>
+                <RefreshCw className="w-10 h-10 mx-auto mb-3 animate-spin" style={{ color: c.teal }} />
+                <p className="text-sm">Loading your meal plan...</p>
               </div>
             )}
 
@@ -522,7 +571,7 @@ export function AIMeals() {
                    >
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-bold" style={{ color: onCardPrimary }}>{day.day || `Day ${dayIndex + 1}`}</h3>
-                      {plan.condition && plan.condition !== 'none' && (
+                      {plan?.condition && plan.condition !== 'none' && (
                         <span className="px-2 py-0.5 rounded-full text-xs capitalize" style={{ background: c.tagBg, color: c.teal }}>
                           {plan.condition.replace(/_/g, ' ')}
                         </span>
@@ -538,6 +587,99 @@ export function AIMeals() {
             </div>
           </motion.div>
         )}
+
+        {/* AI Chatbot Button */}
+        <motion.button
+          onClick={openChat}
+          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+          className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
+          style={{ background: c.teal, boxShadow: `0 4px 20px ${c.teal}66` }}
+          title="Chat with AI Chef"
+        >
+          <MessageSquare className="w-6 h-6 text-white" />
+        </motion.button>
+
+        {/* AI Chatbot Window */}
+        <AnimatePresence>
+          {chatOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 rounded-2xl flex flex-col"
+              style={{ 
+                background: c.cardBg, 
+                border: `1px solid ${c.border}`, 
+                boxShadow: c.cardShadow,
+                maxHeight: '500px'
+              }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: c.border }}>
+                <div className="flex items-center gap-2">
+                  <ChefHat className="w-5 h-5" style={{ color: c.teal }} />
+                  <span className="font-bold" style={{ color: onCardPrimary }}>AI Chef</span>
+                </div>
+                <button
+                  onClick={closeChat}
+                  className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/10"
+                >
+                  <XIcon className="w-4 h-4" style={{ color: onCardSecondary }} />
+                </button>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 p-4 overflow-y-auto" style={{ maxHeight: '350px' }}>
+                {chatMessages.map((msg, i) => (
+                  <div key={i} className={`mb-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div
+                      className="max-w-[80%] rounded-xl px-3 py-2 text-sm"
+                      style={{
+                        background: msg.role === 'user' ? c.teal : c.tagBg,
+                        color: msg.role === 'user' ? '#fff' : onCardPrimary,
+                      }}
+                    >
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="mb-3 flex justify-start">
+                    <div className="rounded-xl px-3 py-2 text-sm" style={{ background: c.tagBg, color: onCardSecondary }}>
+                      Thinking...
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Input */}
+              <div className="p-3 border-t flex gap-2" style={{ borderColor: c.border }}>
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyPress={handleChatKeyPress}
+                  placeholder="Ask about recipes, nutrition..."
+                  className="flex-1 rounded-lg text-sm outline-none"
+                  style={{
+                    background: c.inputBg,
+                    border: `1px solid ${c.inputBorder}`,
+                    color: c.inputText || '#fff',
+                    padding: '8px 12px',
+                  }}
+                />
+                <button
+                  onClick={handleChatSend}
+                  disabled={!chatInput.trim() || chatLoading}
+                  className="w-9 h-9 rounded-lg flex items-center justify-center disabled:opacity-50"
+                  style={{ background: c.teal }}
+                >
+                  <Send className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       </div>
     </div>

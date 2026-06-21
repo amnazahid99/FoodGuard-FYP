@@ -15,9 +15,8 @@ import {
   Calendar,
   Utensils,
   PiggyBank,
-  Play,
-  Star,
   ChevronRight,
+  Star,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import {
@@ -666,14 +665,7 @@ export function Landing() {
                   </div>
                 </div>
               </div>
-            </motion.div>
-          </div>
-
-          <div className="text-center">
-            <Button className="bg-[#1ABC9C] hover:bg-[#16a085] text-white rounded-full px-8 py-4">
-              <Play className="w-5 h-5 mr-2" />
-              Play Video
-            </Button>
+</motion.div>
           </div>
         </div>
       </section>
@@ -1007,28 +999,6 @@ export function Landing() {
               </Button>
             </motion.div>
           </div>
-        </div>
-      </section>
-
-      {/* CTA Banner */}
-      <section className="relative py-20">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <motion.div
-            className="bg-gradient-to-br from-[#1ABC9C] to-blue-500 rounded-3xl p-12"
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              See What You Get with FoodGuard Today
-            </h2>
-            <p className="text-xl text-white/90 mb-8">
-              Join thousands of households and businesses reducing food waste
-            </p>
-            <Button variant="white" className="rounded-full px-12 py-6 text-lg font-semibold">
-              Sign Up Now — It's Free!
-            </Button>
-          </motion.div>
         </div>
       </section>
     </div>
