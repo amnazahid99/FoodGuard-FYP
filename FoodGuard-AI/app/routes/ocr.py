@@ -104,6 +104,8 @@ async def scan_receipt(request: ScanReceiptRequest):
         if mime == "image/jpg":
             mime = "image/jpeg"
 
+        # Try Fireworks first for OCR (vision model)
+        fireworks_error = None
         if fireworks_service.enabled:
             result = await fireworks_service.generate_with_image(
                 OCR_PROMPT,
@@ -113,7 +115,8 @@ async def scan_receipt(request: ScanReceiptRequest):
                 retries=3,
             )
             if not result["success"]:
-                logger.warning(f"Fireworks OCR failed: {result.get('error')}. Falling back to Groq.")
+                fireworks_error = result.get("error")
+                logger.warning(f"Fireworks OCR failed: {fireworks_error}. Falling back to Groq.")
                 result = await groq_service.generate_with_image(
                     OCR_PROMPT,
                     image_b64,
@@ -131,9 +134,15 @@ async def scan_receipt(request: ScanReceiptRequest):
             )
 
         if not result["success"]:
+            error_detail = result.get('error', 'Unknown error')
+            # Provide more helpful message based on common issues
+            if fireworks_error:
+                error_detail = f"OCR service unavailable. Both Fireworks and Groq vision models failed. Fireworks: {fireworks_error[:100]}. Groq: {error_detail[:100]}"
+            elif "model" in error_detail.lower() and ("not found" in error_detail.lower() or "decommissioned" in error_detail.lower()):
+                error_detail = f"OCR vision model unavailable: {error_detail}. Please check your API keys have access to vision models."
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"OCR service failed: {result.get('error')}",
+                detail=error_detail,
             )
 
         raw = result.get("content", "") or result.get("text", "") or ""
