@@ -24,6 +24,7 @@ const typeConfig = {
   success:  { Icon: CheckCircle2,  color: '#22c55e', label: 'Success' },
   shopping: { Icon: ShoppingCart,  color: '#3b82f6', label: 'Shopping' },
   trend:    { Icon: TrendingUp,    color: '#f59e0b', label: 'Insight' },
+  info:     { Icon: Bell,          color: '#3b82f6', label: 'Info' },
 };
 
 const FILTERS = [
@@ -42,7 +43,7 @@ export function Notifications() {
 
   // Hydrate from backend when available
   useEffect(() => {
-    if (Array.isArray(remote) && remote.length > 0) {
+    if (Array.isArray(remote)) {
       setNotifs(remote);
     }
   }, [remote]);
@@ -203,7 +204,7 @@ export function Notifications() {
               </motion.div>
             ) : (
               filtered.map((n) => {
-                const cfg = typeConfig[n.type];
+                const cfg = typeConfig[n.type] || typeConfig.info;
                 const Icon = cfg.Icon;
                 return (
                   <motion.div
@@ -247,7 +248,7 @@ export function Notifications() {
                         className="text-xs sm:text-sm leading-relaxed mb-2"
                         style={{ color: onCardSecondary }}
                       >
-                        {n.body}
+                        {n.body || n.message}
                       </p>
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div className="flex items-center gap-2">
@@ -264,7 +265,7 @@ export function Notifications() {
                             className="text-xs"
                             style={{ color: onCardSecondary }}
                           >
-                            {n.time}
+                            {n.time || ''}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">

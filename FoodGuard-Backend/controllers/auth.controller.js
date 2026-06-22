@@ -4,9 +4,21 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { signAccessToken, signRefreshToken } = require('../utils/generateToken');
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 exports.signup = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) { res.status(400); throw new Error('All fields required'); }
+
+  // Email validation
+  if (!emailRegex.test(email)) {
+    res.status(400); throw new Error('Please enter a valid email address');
+  }
+
+  // Password validation
+  if (password.length < 6) {
+    res.status(400); throw new Error('Password must be at least 6 characters');
+  }
 
   const exists = await User.findOne({ email });
   if (exists) { res.status(409); throw new Error('Email already in use'); }

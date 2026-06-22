@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ShieldCheck, Chrome } from 'lucide-react';
 import { CosmicBackground } from '../components/layout/CosmicBackground';
 import { useTheme } from '../contexts/ThemeContext';
 import { ThemeToggle } from '../components/layout/ThemeToggle';
@@ -11,7 +11,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
   const { notify } = useNotifications();
   const { c } = useTheme();
   // Card stays DARK in both themes — keep in-card text light always
@@ -41,6 +41,19 @@ export function Login() {
       return;
     }
     notify('Welcome back!', 'success');
+    const from = location.state?.from || '/dashboard';
+    navigate(from, { replace: true });
+  };
+
+  const handleGoogleSignIn = async () => {
+    setFormError('');
+    const { ok, error } = await googleLogin();
+    if (!ok) {
+      setFormError(error || 'Google sign-in failed.');
+      notify(error || 'Google sign-in failed', 'error');
+      return;
+    }
+    notify('Signed in with Google!', 'success');
     const from = location.state?.from || '/dashboard';
     navigate(from, { replace: true });
   };
@@ -97,6 +110,28 @@ export function Login() {
               Welcome Back!
             </h1>
             <p className="text-sm text-center" style={{ color: onCardSecondary }}>Sign in to your account</p>
+          </div>
+
+          {/* Google Sign-In Button */}
+          <motion.button
+            onClick={handleGoogleSignIn}
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            type="button"
+            className="w-full py-3.5 rounded-xl font-semibold text-white text-sm mb-4 flex items-center justify-center gap-2"
+            style={{
+              background: '#4285F4',
+              boxShadow: '0 4px 24px rgba(66, 133, 244, 0.4)',
+            }}
+          >
+            <Chrome className="w-5 h-5" />
+            Sign in with Google
+          </motion.button>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-6">
+            <div className="flex-1 h-px" style={{ background: c.divider }} />
+            <span className="text-sm" style={{ color: onCardMuted }}>or</span>
+            <div className="flex-1 h-px" style={{ background: c.divider }} />
           </div>
 
           {/* Form */}
@@ -212,17 +247,9 @@ export function Login() {
             )}
           </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px" style={{ background: c.divider }} />
-            <span className="text-sm" style={{ color: onCardMuted }}>or</span>
-            <div className="flex-1 h-px" style={{ background: c.divider }} />
-          </div>
-
-          
-
+          {/* Sign Up Link */}
           <p className="text-center text-sm mt-6" style={{ color: onCardSecondary }}>
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link to="/signup" className="font-medium hover:opacity-80" style={{ color: c.teal }}>
               Sign Up
             </Link>

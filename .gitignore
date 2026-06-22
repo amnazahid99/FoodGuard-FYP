@@ -190,3 +190,6 @@ FoodGuard-Frontend/.env.local
 
 # CLAUDE.md (project instructions for AI assistants)
 CLAUDE.md
+
+# FoodGuard Viva Knowledge Base - not committed to GitHub
+foodguard-viva-knowledge-base.txt

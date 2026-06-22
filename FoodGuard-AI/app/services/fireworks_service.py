@@ -13,7 +13,7 @@ class FireworksService:
         settings = get_settings()
         self.api_key = (settings.fireworks_api_key or "").strip()
         self.base_url = "https://api.fireworks.ai/inference/v1"
-        self.default_model = "accounts/fireworks/models/kimi-k2p5"
+        self.default_model = "accounts/fireworks/models/qwen2-vl-72b-instruct"
         self.timeout = 45.0
         self.max_retries = 3
 

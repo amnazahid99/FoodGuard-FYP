@@ -77,6 +77,22 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const googleLogin = useCallback(async () => {
+    setError(null);
+    try {
+      const result = await authService.googleLogin();
+      if (result.ok) {
+        setUser(result.user || null);
+        return { ok: true };
+      }
+      return { ok: false, error: result.error || 'Google login failed.' };
+    } catch (err) {
+      const message = apiError(err, 'Google login failed. Please try again.');
+      setError(message);
+      return { ok: false, error: message };
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     await authService.logout();
     setUser(null);
@@ -89,6 +105,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: !!user,
     login,
     signup,
+    googleLogin,
     logout,
     refreshProfile: async () => {
       try { const u = await authService.profile(); setUser(u); return u; }

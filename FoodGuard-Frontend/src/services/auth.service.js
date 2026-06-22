@@ -26,6 +26,42 @@ export const authService = {
     return { token, user };
   },
 
+  async googleLogin() {
+    const width = 500;
+    const height = 600;
+    const left = (screenX || screen.availWidth) / 2 - width / 2;
+    const top = (screenY || screen.availHeight) / 2 - height / 2;
+    
+    const popup = window.open(
+      '/api/auth/google',
+      'google-login',
+      `width=${width},height=${height},top=${top},left=${left}`
+    );
+    
+    return new Promise((resolve) => {
+      const handleMessage = (event) => {
+        if (event.data?.type === 'google-auth-success') {
+          window.removeEventListener('message', handleMessage);
+          const { token, refreshToken, user } = event.data;
+          persist(token, user, true, refreshToken);
+          resolve({ ok: true, user });
+        } else if (event.data?.type === 'google-auth-error') {
+          window.removeEventListener('message', handleMessage);
+          resolve({ ok: false, error: event.data.error });
+        }
+      };
+      window.addEventListener('message', handleMessage);
+      
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          window.removeEventListener('message', handleMessage);
+          resolve({ ok: false, error: 'Login cancelled' });
+        }
+      }, 500);
+    });
+  },
+
   async logout() {
     try { await api.post('/auth/logout'); } catch (_) {}
     localStorage.removeItem(TOKEN_KEY);

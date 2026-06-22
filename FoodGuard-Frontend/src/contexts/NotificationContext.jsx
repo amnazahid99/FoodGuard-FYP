@@ -7,7 +7,7 @@ const NotificationContext = createContext(null);
 export function NotificationProvider({ children }) {
   const { isAuthenticated } = useAuth();
   const [toasts, setToasts] = useState([]);
-  const [notifications, setNotifications] = useState(null);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -24,7 +24,7 @@ export function NotificationProvider({ children }) {
       setNotifications(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err.message);
-      setNotifications(null); // null = let component use its seed
+      setNotifications([]); // Empty array so component renders empty state
     } finally { setLoading(false); }
   }, []);
 
